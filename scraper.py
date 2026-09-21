@@ -37,8 +37,6 @@ REQUEST_RETRIES = int(os.environ.get("REQUEST_RETRIES", "4"))
 DETAIL_REFRESH_HOURS = int(os.environ.get("DETAIL_REFRESH_HOURS", "6"))
 MAX_DETAIL_FETCH_PER_PORTAL = int(os.environ.get("MAX_DETAIL_FETCH_PER_PORTAL", "900"))
 PORTAL_BUDGET_SECONDS = int(os.environ.get("PORTAL_BUDGET_SECONDS", "720"))
-MAX_TRANSLATIONS_PER_RUN = int(os.environ.get("MAX_TRANSLATIONS_PER_RUN", "120"))
-TRANSLATION_BUDGET_SECONDS = int(os.environ.get("TRANSLATION_BUDGET_SECONDS", "90"))
 DATA_PATH = os.environ.get("TENDER_DATA_PATH", "data/tenders.json")
 MP_PLACES_PATH = os.path.join(os.path.dirname(__file__), "data", "mp_places.json")
 NCL_NAME = "Northern Coalfields Limited"
@@ -783,73 +781,154 @@ def valid_hindi_text(text, source=""):
     return re.sub(r"(?:बैधान|बैधन)", "बैढ़न", text)
 
 
+HINDI_TENDER_PHRASES = {
+    "comprehensive annual maintenance contract": "समग्र वार्षिक रखरखाव अनुबंध",
+    "operation and maintenance": "संचालन एवं रखरखाव",
+    "repair and maintenance": "मरम्मत एवं रखरखाव",
+    "annual maintenance contract": "वार्षिक रखरखाव अनुबंध",
+    "comprehensive maintenance": "समग्र रखरखाव",
+    "construction of": "निर्माण कार्य",
+    "reconstruction of": "पुनर्निर्माण कार्य",
+    "renovation of": "नवीनीकरण कार्य",
+    "improvement of": "सुधार कार्य",
+    "development of": "विकास कार्य",
+    "maintenance of": "रखरखाव कार्य",
+    "repairing of": "मरम्मत कार्य",
+    "repair of": "मरम्मत कार्य",
+    "supply and installation of": "आपूर्ति एवं स्थापना",
+    "supply, installation, testing and commissioning": "आपूर्ति, स्थापना, परीक्षण एवं चालू करना",
+    "installation and commissioning": "स्थापना एवं चालू करना",
+    "providing and fixing": "उपलब्ध कराना एवं लगाना",
+    "hiring of vehicle for government uses": "शासकीय उपयोग हेतु वाहन किराये पर लेना",
+    "hiring of vehicle": "वाहन किराये पर लेना",
+    "hiring of": "किराये पर लेना",
+    "procurement of": "क्रय कार्य",
+    "supply of": "आपूर्ति कार्य",
+    "purchase of": "खरीद कार्य",
+    "invitation of": "आमंत्रण",
+    "expression of interest": "रुचि की अभिव्यक्ति",
+    "request for proposal for": "प्रस्ताव आमंत्रण हेतु",
+    "request for proposal": "प्रस्ताव हेतु अनुरोध",
+    "consultancy services": "परामर्श सेवाएं",
+    "manpower services": "मानव संसाधन सेवाएं",
+    "security services": "सुरक्षा सेवाएं",
+    "housekeeping services": "साफ-सफाई सेवाएं",
+    "government uses": "शासकीय उपयोग",
+    "different locations": "विभिन्न स्थानों",
+    "different location": "विभिन्न स्थान",
+    "railway track": "रेल पटरी",
+    "open gym": "खुली व्यायामशाला",
+    "medical equipment": "चिकित्सा उपकरण",
+    "office equipment": "कार्यालय उपकरण",
+    "sports equipment": "खेल उपकरण",
+    "fire fighting": "अग्निशमन",
+    "solid waste management": "ठोस अपशिष्ट प्रबंधन",
+    "sewage treatment plant": "मलजल उपचार संयंत्र",
+    "water treatment plant": "जल उपचार संयंत्र",
+    "drinking water": "पेयजल",
+    "water supply": "जलापूर्ति",
+    "street light": "स्ट्रीट लाइट",
+    "boundary wall": "चारदीवारी",
+    "community hall": "सामुदायिक भवन",
+    "school building": "विद्यालय भवन",
+    "office building": "कार्यालय भवन",
+    "hospital building": "अस्पताल भवन",
+    "cement concrete road": "सीमेंट कंक्रीट सड़क",
+    "cc road": "सीसी सड़क",
+    "approach road": "पहुंच मार्ग",
+    "road work": "सड़क कार्य",
+    "road": "सड़क",
+    "bridge": "पुल",
+    "culvert": "पुलिया",
+    "drainage": "जल निकासी",
+    "drain": "नाली",
+    "pipeline": "पाइपलाइन",
+    "electrification": "विद्युतीकरण",
+    "electrical work": "विद्युत कार्य",
+    "civil work": "सिविल कार्य",
+    "painting work": "पुताई कार्य",
+    "sanitation": "स्वच्छता",
+    "cleaning": "सफाई",
+    "equipment": "उपकरण",
+    "material": "सामग्री",
+    "medicine": "औषधि",
+    "food": "खाद्य सामग्री",
+    "furniture": "फर्नीचर",
+    "computer": "कंप्यूटर",
+    "building": "भवन",
+    "buildings": "भवनों",
+    "department": "विभाग",
+    "municipal corporation": "नगर निगम",
+    "municipal council": "नगर पालिका परिषद",
+    "government": "शासकीय",
+    "hospital": "अस्पताल",
+    "school": "विद्यालय",
+    "college": "महाविद्यालय",
+    "pump": "पंप",
+    "plant": "संयंत्र",
+    "lighting system": "प्रकाश व्यवस्था",
+    "system": "प्रणाली",
+    "contract": "अनुबंध",
+    "tender": "निविदा",
+    "period": "अवधि",
+    "complete": "पूर्ण",
+    "conversion": "परिवर्तन",
+    "digital": "डिजिटल",
+    "analog": "एनालॉग",
+    "years": "वर्ष",
+    "year": "वर्ष",
+    "days": "दिन",
+    "day": "दिन",
+    "numbers": "संख्या",
+    "number": "संख्या",
+    "area": "क्षेत्र",
+    "village": "ग्राम",
+    "project": "परियोजना",
+    "vehicle": "वाहन",
+    "work": "कार्य",
+    "services": "सेवाएं",
+    "service": "सेवा",
+    "ward no": "वार्ड क्रमांक",
+    "various places": "विभिन्न स्थानों",
+    "first call": "प्रथम आमंत्रण",
+    "second call": "द्वितीय आमंत्रण",
+    "third call": "तृतीय आमंत्रण",
+    "two": "दो",
+    "one": "एक",
+    "of": "का",
+    "under": "के अंतर्गत",
+    "with": "सहित",
+    "from": "से",
+    "for": "हेतु",
+    "and": "एवं",
+    "at": "में",
+    "in": "में",
+}
+
+
 def translate_hindi(text):
-    for attempt in range(2):
-        try:
-            response = requests.get(
-                "https://translate.googleapis.com/translate_a/single",
-                params={"client": "gtx", "sl": "en", "tl": "hi", "dt": "t", "q": text},
-                headers={"User-Agent": UA},
-                timeout=(CONNECT_TIMEOUT, 12),
-            )
-            if response.status_code == 429:
-                return "", "rate_limited"
-            response.raise_for_status()
-            data = response.json()
-            translated = "".join(
-                str(part[0]) for part in (data[0] if data and isinstance(data, list) else [])
-                if isinstance(part, list) and part and part[0]
-            ).strip()
-            translated = valid_hindi_text(translated, text)
-            if translated:
-                return translated, ""
-        except Exception as exc:
-            if attempt:
-                return "", str(exc)[:160]
-            time.sleep(0.8)
-    return "", "translation_failed"
+    result = clean(text)
+    replacements = 0
+    for english, hindi in sorted(HINDI_TENDER_PHRASES.items(), key=lambda item: len(item[0]), reverse=True):
+        result, count = re.subn(r"(?<![A-Za-z])" + re.escape(english) + r"(?![A-Za-z])", hindi, result, flags=re.I)
+        replacements += count
+    result = re.sub(r"\s+", " ", result).strip(" .,-")
+    return (result, "") if replacements and valid_hindi_text(result, text) else ("", "no_glossary_match")
 
 
-def add_hindi_translations(rows, old_rows):
-    cache = {}
-    for row in [*old_rows, *rows]:
-        key = normalize_translation_key(row.get("work_en"))
-        hi = valid_hindi_text(row.get("work_hi"), row.get("work_en"))
-        if key and hi:
-            cache[key] = hi
-    for row in rows:
-        key = normalize_translation_key(row.get("work_en"))
-        if key in cache:
-            row["work_hi"] = cache[key]
-
-    pending = {}
-    for row in rows:
-        text = str(row.get("work_en") or "").strip()
-        if text and not valid_hindi_text(row.get("work_hi"), text):
-            pending.setdefault(normalize_translation_key(text), {"text": text, "rows": []})["rows"].append(row)
-    ordered = sorted(
-        pending.values(),
-        key=lambda item: min(priority(r.get("source", ""), r.get("organisation", ""), f"{r.get('district_city', '')} {r.get('location', '')}", r) for r in item["rows"]),
-    )[:MAX_TRANSLATIONS_PER_RUN]
-    started = time.monotonic()
+def add_hindi_translations(rows, _old_rows):
     translated = 0
-    attempted = 0
-    rate_limited = False
-    for item in ordered:
-        if time.monotonic() - started > TRANSLATION_BUDGET_SECONDS:
-            break
-        attempted += 1
-        hi, error = translate_hindi(item["text"])
-        if error == "rate_limited":
-            rate_limited = True
-            break
-        if hi:
-            for row in item["rows"]:
-                row["work_hi"] = hi
-            translated += len(item["rows"])
-        time.sleep(0.5)
-    remaining = sum(1 for row in rows if row.get("work_en") and not valid_hindi_text(row.get("work_hi"), row.get("work_en")))
-    return {"translated_this_run": translated, "attempted": attempted, "remaining": remaining, "rate_limited": rate_limited}
+    for row in rows:
+        hindi, _error = translate_hindi(row.get("work_en"))
+        row["work_hi"] = hindi
+        row["work_hi_method"] = "controlled_tender_glossary_v1" if hindi else ""
+        translated += bool(hindi)
+    return {
+        "method": "controlled_tender_glossary_v1",
+        "translated": translated,
+        "remaining": sum(1 for row in rows if row.get("work_en") and not row.get("work_hi")),
+        "network_translation": False,
+    }
 
 
 def priority(source, org, hint, old):

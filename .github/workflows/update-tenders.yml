@@ -39,8 +39,6 @@ jobs:
           READ_TIMEOUT: '45'
           ORG_INDEX_READ_TIMEOUT: '75'
           REQUEST_RETRIES: '3'
-          MAX_TRANSLATIONS_PER_RUN: '40'
-          TRANSLATION_BUDGET_SECONDS: '90'
         run: python scraper.py
       - name: Commit refreshed cache
         run: |
