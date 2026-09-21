@@ -216,6 +216,14 @@ def mp_place_index():
                     claims.setdefault(key, set()).add(district)
     except Exception:
         claims = {}
+    for place, district in {
+        "ganjbasoda": "Vidisha",
+        "pachmarhi": "Narmadapuram",
+        # These names occur in more than one district; context must decide them.
+        "shahpur": "Burhanpur",
+        "manpur": "Indore",
+    }.items():
+        claims.setdefault(place, set()).add(district)
     _MP_PLACE_INDEX = {
         place: next(iter(districts))
         for place, districts in sorted(claims.items(), key=lambda item: len(item[0]), reverse=True)
@@ -224,13 +232,38 @@ def mp_place_index():
     return _MP_PLACE_INDEX
 
 
+def mp_place_match(value):
+    """Return the most specific verified MP place and its district."""
+    text = re.sub(r"[^a-z0-9]+", " ", clean(value).casefold()).strip()
+    if not text:
+        return "", ""
+    padded = f" {text} "
+    for place, district in mp_place_index().items():
+        if f" {place} " in padded:
+            return " ".join(word.capitalize() for word in place.split()), district
+    return "", ""
+
+
 def resolve_mp_district_city(row):
-    district = district_from_hints(clean(row.get("district")))
     location = clean(row.get("location"))
     pincode = clean(row.get("pincode"))
+    city, location_district = mp_place_match(location)
+    # An explicitly named district in a location is stronger than a town alias.
+    named_district = next(
+        (
+            candidate
+            for candidate in sorted(MP_DISTRICTS, key=len, reverse=True)
+            if re.search(r"\b" + re.escape(candidate) + r"\b", location, re.I)
+        ),
+        "",
+    )
+    district = named_district or location_district or district_from_hints(clean(row.get("district")))
+    if city and location_district != district:
+        city = ""
     if not district:
-        authority_text = " ".join(clean(row.get(k)) for k in ("location", "organisation", "org_unit", "listing_row_hint"))
-        district = district_from_hints(authority_text)
+        authority_text = " ".join(clean(row.get(k)) for k in ("org_unit", "listing_row_hint", "organisation"))
+        city, district = mp_place_match(authority_text)
+        district = district or district_from_hints(authority_text)
     if not district and pincode.startswith(("48688", "48689")):
         district = "Singrauli"
     if not district:
@@ -240,9 +273,11 @@ def resolve_mp_district_city(row):
             x in norm(" ".join([row.get("work_en", ""), row.get("nit_ref", ""), row.get("org_unit", "")]))
             for x in ("waidhan", "baidhan")
         ):
-            location = "Waidhan"
-    if district and location and norm(location) != norm(district) and len(location) <= 40:
-        return f"{district} / {location}"
+            city = "Waidhan"
+    if district:
+        row["district"] = district
+    if district and city and norm(city) != norm(district):
+        return f"{district} / {city}"
     return district or location
 
 
