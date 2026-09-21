@@ -2,6 +2,12 @@ name: Update Tender Data
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scraper.py'
+      - 'requirements.txt'
+      - '.github/workflows/update-tenders.yml'
   schedule:
     - cron: '*/15 * * * *'
 
