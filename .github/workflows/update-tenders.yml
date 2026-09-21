@@ -7,11 +7,11 @@ permissions:
   contents: write
 concurrency:
   group: tender-refresh
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,6 +20,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Fetch MP and Coal India tenders
+        timeout-minutes: 4
         run: python scraper.py
       - name: Commit refreshed cache
         run: |
