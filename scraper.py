@@ -41,7 +41,9 @@ PORTAL_BUDGET_SECONDS = int(os.environ.get("PORTAL_BUDGET_SECONDS", "720"))
 MAX_TRANSLATIONS_PER_RUN = int(os.environ.get("MAX_TRANSLATIONS_PER_RUN", "120"))
 TRANSLATION_BUDGET_SECONDS = int(os.environ.get("TRANSLATION_BUDGET_SECONDS", "90"))
 DATA_PATH = os.environ.get("TENDER_DATA_PATH", "data/tenders.json")
+MP_PLACES_PATH = os.path.join(os.path.dirname(__file__), "data", "mp_places.json")
 NCL_NAME = "Northern Coalfields Limited"
+_MP_PLACE_INDEX = None
 
 MP_DISTRICTS = [
     "Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani",
@@ -194,27 +196,46 @@ def district_from_hints(value):
     for district, terms in aliases.items():
         if any(term in low for term in terms):
             return district
+    for place, district in mp_place_index().items():
+        if re.search(r"(?<![a-z0-9])" + re.escape(place) + r"(?![a-z0-9])", low):
+            return district
     return ""
 
 
+def mp_place_index():
+    global _MP_PLACE_INDEX
+    if _MP_PLACE_INDEX is not None:
+        return _MP_PLACE_INDEX
+    claims = {}
+    try:
+        with open(MP_PLACES_PATH, encoding="utf-8") as handle:
+            districts = json.load(handle).get("districts", {})
+        for district, places in districts.items():
+            for place in places:
+                key = re.sub(r"[^a-z0-9]+", " ", str(place).casefold()).strip()
+                if len(key) >= 4:
+                    claims.setdefault(key, set()).add(district)
+    except Exception:
+        claims = {}
+    _MP_PLACE_INDEX = {
+        place: next(iter(districts))
+        for place, districts in sorted(claims.items(), key=lambda item: len(item[0]), reverse=True)
+        if len(districts) == 1
+    }
+    return _MP_PLACE_INDEX
+
+
 def resolve_mp_district_city(row):
-    district = clean(row.get("district"))
+    district = district_from_hints(clean(row.get("district")))
     location = clean(row.get("location"))
     pincode = clean(row.get("pincode"))
     if not district:
-        district = district_from_hints(
-            " ".join(
-                clean(row.get(k))
-                for k in (
-                    "work_en",
-                    "nit_ref",
-                    "location",
-                    "organisation",
-                    "org_unit",
-                    "listing_row_hint",
-                )
-            )
-        )
+        authority_text = " ".join(clean(row.get(k)) for k in ("location", "organisation", "org_unit", "listing_row_hint"))
+        district = district_from_hints(authority_text)
+    if not district and pincode.startswith(("48688", "48689")):
+        district = "Singrauli"
+    if not district:
+        district = district_from_hints(" ".join(clean(row.get(k)) for k in ("nit_ref", "work_en")))
     if district == "Singrauli" and (not location or location.casefold() == "singrauli"):
         if pincode in {"486886", "486889"} or any(
             x in norm(" ".join([row.get("work_en", ""), row.get("nit_ref", ""), row.get("org_unit", "")]))
