@@ -2,7 +2,6 @@ import json
 import os
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from urllib.parse import urljoin
 
@@ -774,22 +773,19 @@ def add_hindi_translations(rows, old_rows):
     translated = 0
     attempted = 0
     rate_limited = False
-    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="RSPHindi") as pool:
-        futures = {pool.submit(translate_hindi, item["text"]): item for item in ordered}
-        for future in as_completed(futures):
-            if time.monotonic() - started > TRANSLATION_BUDGET_SECONDS:
-                break
-            item = futures[future]
-            attempted += 1
-            hi, error = future.result()
-            if error == "rate_limited":
-                rate_limited = True
-            if hi:
-                for row in item["rows"]:
-                    row["work_hi"] = hi
-                translated += len(item["rows"])
-        for future in futures:
-            future.cancel()
+    for item in ordered:
+        if time.monotonic() - started > TRANSLATION_BUDGET_SECONDS:
+            break
+        attempted += 1
+        hi, error = translate_hindi(item["text"])
+        if error == "rate_limited":
+            rate_limited = True
+            break
+        if hi:
+            for row in item["rows"]:
+                row["work_hi"] = hi
+            translated += len(item["rows"])
+        time.sleep(0.5)
     remaining = sum(1 for row in rows if row.get("work_en") and not valid_hindi_text(row.get("work_hi"), row.get("work_en")))
     return {"translated_this_run": translated, "attempted": attempted, "remaining": remaining, "rate_limited": rate_limited}
 
