@@ -2,6 +2,6 @@
 
 Responsive web/mobile companion for RSP Tender Monitor.
 
-Base parser/source: RSP Tender Monitor v2.6.1 AREA_PARSER_FIX.
+Base parser/source: Google Drive desktop source `RSP_Tender_Monitor_v2.6.1_SOURCE_AREA_PARSER_FIX.zip`.
 
-Monitors public tender information from supported NIC e-procurement portals. RSP branding: Reliable, Secure & Perfect.
+The public web repo intentionally excludes owner keygen/private licensing files. It monitors public NIC tender pages for MP Tenders and Coal India/NCL, refreshes data every 15 minutes through GitHub Actions, and deploys automatically to GitHub Pages.
