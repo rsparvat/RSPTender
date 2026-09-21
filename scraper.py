@@ -584,6 +584,10 @@ class PortalClient:
         org_unit = " > ".join(chain[1:]) if len(chain) > 1 else ""
         if not org_unit:
             org_unit = pv("Organisation Unit", "Organization Unit", "Office Name", "Department Name", "Division")
+        if not org_unit:
+            org_unit = pv("Tender Inviting Authority Name", "Inviting Authority Name", "Name")
+        if not org_unit:
+            org_unit = location or bid_place
         project = ""
         if self.source == "COAL":
             if len(chain) >= 2:
@@ -920,6 +924,24 @@ def enrich_counts(rows, old_by_id):
     return counts
 
 
+def repair_organisation_names(rows):
+    for row in rows:
+        organisation = clean(row.get("organisation"))
+        if not organisation:
+            organisation = clean(row.get("source_name")) or ("Coal India" if row.get("source") == "COAL" else "MP Tenders")
+            row["organisation"] = organisation
+            row["organisation_short"] = organisation_short(organisation)
+        if clean(row.get("org_unit")):
+            continue
+        fields = row.get("portal_fields") if isinstance(row.get("portal_fields"), dict) else {}
+        authority = clean(fields.get("Tender Inviting Authority Name") or fields.get("Inviting Authority Name") or fields.get("Name"))
+        if authority.casefold() in {"name", "nil", "na", "n/a"}:
+            authority = ""
+        fallback = authority or clean(row.get("location")) or clean(row.get("project"))
+        if fallback:
+            row["org_unit"] = fallback
+
+
 def main():
     os.makedirs(os.path.dirname(DATA_PATH) or ".", exist_ok=True)
     old_rows = load_old()
@@ -943,6 +965,7 @@ def main():
             row.get("organisation", ""),
         ),
     )
+    repair_organisation_names(rows)
     translation_status = add_hindi_translations(rows, old_rows)
     counts = enrich_counts(rows, old_by_id)
     errors = [f"{src}: {err}" for src, st in scan_status.items() for err in st.get("errors", [])]
