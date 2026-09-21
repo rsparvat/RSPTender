@@ -21,7 +21,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,7 +30,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Fetch MP and Coal India tenders
-        timeout-minutes: 13
+        timeout-minutes: 17
         env:
           PORTAL_BUDGET_SECONDS: '360'
           MAX_DETAIL_FETCH_PER_PORTAL: '900'
@@ -39,6 +39,8 @@ jobs:
           READ_TIMEOUT: '45'
           ORG_INDEX_READ_TIMEOUT: '75'
           REQUEST_RETRIES: '3'
+          MAX_TRANSLATIONS_PER_RUN: '40'
+          TRANSLATION_BUDGET_SECONDS: '90'
         run: python scraper.py
       - name: Commit refreshed cache
         run: |

@@ -2,6 +2,7 @@ import json
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from urllib.parse import urljoin
 
@@ -37,6 +38,8 @@ REQUEST_RETRIES = int(os.environ.get("REQUEST_RETRIES", "4"))
 DETAIL_REFRESH_HOURS = int(os.environ.get("DETAIL_REFRESH_HOURS", "6"))
 MAX_DETAIL_FETCH_PER_PORTAL = int(os.environ.get("MAX_DETAIL_FETCH_PER_PORTAL", "900"))
 PORTAL_BUDGET_SECONDS = int(os.environ.get("PORTAL_BUDGET_SECONDS", "720"))
+MAX_TRANSLATIONS_PER_RUN = int(os.environ.get("MAX_TRANSLATIONS_PER_RUN", "120"))
+TRANSLATION_BUDGET_SECONDS = int(os.environ.get("TRANSLATION_BUDGET_SECONDS", "90"))
 DATA_PATH = os.environ.get("TENDER_DATA_PATH", "data/tenders.json")
 NCL_NAME = "Northern Coalfields Limited"
 
@@ -666,6 +669,8 @@ def merge_keep_good(old_row, new_row):
         if value in (None, "", []):
             continue
         merged[key] = value
+    if new_row.get("work_en") and normalize_translation_key(new_row.get("work_en")) != normalize_translation_key(old_row.get("work_en")):
+        merged["work_hi"] = ""
     if old_row.get("bid_end") and new_row.get("bid_end"):
         old_dt = parse_dt(old_row.get("bid_end"))
         new_dt = parse_dt(new_row.get("bid_end"))
@@ -680,6 +685,92 @@ def merge_keep_good(old_row, new_row):
         else resolve_mp_district_city(merged)
     )
     return merged
+
+
+def normalize_translation_key(text):
+    return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def valid_hindi_text(text, source=""):
+    text = str(text or "").strip()
+    if not text or not re.search(r"[\u0900-\u097f]", text):
+        return ""
+    if source and normalize_translation_key(text) == normalize_translation_key(source):
+        return ""
+    text = re.sub(r"(?:वैधान|वैधन|वाइधान|वायधान)", "वैढ़न", text)
+    return re.sub(r"(?:बैधान|बैधन)", "बैढ़न", text)
+
+
+def translate_hindi(text):
+    for attempt in range(2):
+        try:
+            response = requests.get(
+                "https://translate.googleapis.com/translate_a/single",
+                params={"client": "gtx", "sl": "en", "tl": "hi", "dt": "t", "q": text},
+                headers={"User-Agent": UA},
+                timeout=(CONNECT_TIMEOUT, 12),
+            )
+            if response.status_code == 429:
+                return "", "rate_limited"
+            response.raise_for_status()
+            data = response.json()
+            translated = "".join(
+                str(part[0]) for part in (data[0] if data and isinstance(data, list) else [])
+                if isinstance(part, list) and part and part[0]
+            ).strip()
+            translated = valid_hindi_text(translated, text)
+            if translated:
+                return translated, ""
+        except Exception as exc:
+            if attempt:
+                return "", str(exc)[:160]
+            time.sleep(0.8)
+    return "", "translation_failed"
+
+
+def add_hindi_translations(rows, old_rows):
+    cache = {}
+    for row in [*old_rows, *rows]:
+        key = normalize_translation_key(row.get("work_en"))
+        hi = valid_hindi_text(row.get("work_hi"), row.get("work_en"))
+        if key and hi:
+            cache[key] = hi
+    for row in rows:
+        key = normalize_translation_key(row.get("work_en"))
+        if key in cache:
+            row["work_hi"] = cache[key]
+
+    pending = {}
+    for row in rows:
+        text = str(row.get("work_en") or "").strip()
+        if text and not valid_hindi_text(row.get("work_hi"), text):
+            pending.setdefault(normalize_translation_key(text), {"text": text, "rows": []})["rows"].append(row)
+    ordered = sorted(
+        pending.values(),
+        key=lambda item: min(priority(r.get("source", ""), r.get("organisation", ""), f"{r.get('district_city', '')} {r.get('location', '')}", r) for r in item["rows"]),
+    )[:MAX_TRANSLATIONS_PER_RUN]
+    started = time.monotonic()
+    translated = 0
+    attempted = 0
+    rate_limited = False
+    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="RSPHindi") as pool:
+        futures = {pool.submit(translate_hindi, item["text"]): item for item in ordered}
+        for future in as_completed(futures):
+            if time.monotonic() - started > TRANSLATION_BUDGET_SECONDS:
+                break
+            item = futures[future]
+            attempted += 1
+            hi, error = future.result()
+            if error == "rate_limited":
+                rate_limited = True
+            if hi:
+                for row in item["rows"]:
+                    row["work_hi"] = hi
+                translated += len(item["rows"])
+        for future in futures:
+            future.cancel()
+    remaining = sum(1 for row in rows if row.get("work_en") and not valid_hindi_text(row.get("work_hi"), row.get("work_en")))
+    return {"translated_this_run": translated, "attempted": attempted, "remaining": remaining, "rate_limited": rate_limited}
 
 
 def priority(source, org, hint, old):
@@ -835,6 +926,7 @@ def main():
             row.get("organisation", ""),
         ),
     )
+    translation_status = add_hindi_translations(rows, old_rows)
     counts = enrich_counts(rows, old_by_id)
     errors = [f"{src}: {err}" for src, st in scan_status.items() for err in st.get("errors", [])]
     payload = {
@@ -843,6 +935,7 @@ def main():
         "count": len(rows),
         "counts": counts,
         "scan_status": scan_status,
+        "translation_status": translation_status,
         "errors": errors,
         "portal_limits": {
             "max_detail_fetch_per_portal": MAX_DETAIL_FETCH_PER_PORTAL,
