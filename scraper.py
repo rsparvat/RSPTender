@@ -917,16 +917,13 @@ def translate_hindi(text):
 
 
 def add_hindi_translations(rows, _old_rows):
-    translated = 0
     for row in rows:
-        hindi, _error = translate_hindi(row.get("work_en"))
-        row["work_hi"] = hindi
-        row["work_hi_method"] = "controlled_tender_glossary_v1" if hindi else ""
-        translated += bool(hindi)
+        row["work_hi"] = ""
+        row["work_hi_method"] = ""
     return {
-        "method": "controlled_tender_glossary_v1",
-        "translated": translated,
-        "remaining": sum(1 for row in rows if row.get("work_en") and not row.get("work_hi")),
+        "method": "disabled_until_verified",
+        "translated": 0,
+        "remaining": sum(1 for row in rows if row.get("work_en")),
         "network_translation": False,
     }
 
