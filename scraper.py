@@ -866,6 +866,94 @@ def priority(source, org, hint, old):
     return (0, 2)
 
 
+def row_from_listing(source, org, detail_url, hint):
+    """Create a usable record from an organisation-list row before detail enrichment."""
+    id_match = re.search(r"\b20\d{2}_[A-Za-z0-9]+_\d+_\d+\b", hint)
+    if not id_match:
+        return None
+    tender_id = id_match.group(0)
+    blocks = [clean(value) for value in re.findall(r"\[([^\]]*)\]", hint)]
+    id_index = next((i for i, value in enumerate(blocks) if value == tender_id), -1)
+    work = blocks[id_index - 2] if id_index >= 2 else ""
+    nit_ref = blocks[id_index - 1] if id_index >= 1 else ""
+    dates = re.findall(r"\d{1,2}-[A-Za-z]{3}-\d{4}\s+\d{1,2}:\d{2}\s+[AP]M", hint, re.I)
+    published = dates[0] if dates else ""
+    bid_end = dates[1] if len(dates) > 1 else ""
+    tail = clean(hint[id_match.end():]).lstrip("] ")
+    chain = [clean(value) for value in tail.split("||") if clean(value)]
+    organisation = chain[0] if chain else clean(org)
+    org_unit = " > ".join(chain[1:]) if len(chain) > 1 else organisation
+    row = {
+        "tender_id": tender_id,
+        "source": source,
+        "source_name": PORTALS[source]["name"],
+        "project": chain[1] if source == "COAL" and len(chain) > 1 else "",
+        "district": "",
+        "district_city": "",
+        "location": "",
+        "pincode": "",
+        "organisation": organisation,
+        "organisation_short": organisation_short(organisation),
+        "org_unit": org_unit,
+        "work_en": work,
+        "work_hi": "",
+        "nit_ref": nit_ref,
+        "pac": None,
+        "tender_fee": None,
+        "processing_fee": None,
+        "total_fee": None,
+        "emd": None,
+        "total_payable": None,
+        "published_date": published,
+        "published_iso": iso_dt(published),
+        "bid_end": bid_end,
+        "bid_end_iso": iso_dt(bid_end),
+        "detail_url": detail_url,
+        "detail_fetched": "",
+        "corrigendum_count": 0,
+        "corrigendum_latest": "",
+        "corrigendum_url": "",
+        "corrigenda": [],
+        "portal_fields": {},
+        "listing_row_hint": hint,
+    }
+    row["district_city"] = (
+        coal_project_label(organisation, row["project"])
+        if source == "COAL"
+        else resolve_mp_district_city(row)
+    )
+    row["status"] = status_for(row)
+    return row
+
+
+def merge_listing(old_row, listing_row):
+    if not old_row:
+        return listing_row
+    # Listing rows are authoritative for availability and dates, but must not
+    # erase richer fee, authority, location, Hindi or corrigendum detail.
+    update_keys = (
+        "tender_id",
+        "source",
+        "source_name",
+        "organisation",
+        "organisation_short",
+        "work_en",
+        "nit_ref",
+        "published_date",
+        "published_iso",
+        "bid_end",
+        "bid_end_iso",
+        "detail_url",
+        "listing_row_hint",
+    )
+    update = {key: listing_row.get(key) for key in update_keys}
+    if not clean(old_row.get("org_unit")):
+        update["org_unit"] = listing_row.get("org_unit")
+    if not clean(old_row.get("project")):
+        update["project"] = listing_row.get("project")
+    return merge_keep_good(old_row, update)
+
+
 def scan_portal(source, old_by_id):
     client = PortalClient(source)
     start = time.monotonic()
@@ -877,6 +965,7 @@ def scan_portal(source, old_by_id):
         "organisations_total": 0,
         "organisations_scanned": 0,
         "links_found": 0,
+        "listing_records": 0,
         "details_fetched": 0,
         "kept_from_cache": 0,
         "errors": [],
@@ -913,6 +1002,12 @@ def scan_portal(source, old_by_id):
     uniq.sort(key=lambda item: priority(source, item[0], item[2], item[3]))
 
     for org, detail_url, hint, old in uniq:
+        listing_row = row_from_listing(source, org, detail_url, hint)
+        if listing_row:
+            found[listing_row["tender_id"]] = merge_listing(old, listing_row)
+            status["listing_records"] += 1
+
+    for org, detail_url, hint, old in uniq:
         if time.monotonic() - start > PORTAL_BUDGET_SECONDS:
             status["errors"].append("portal time budget reached while reading tender details")
             break
@@ -929,7 +1024,7 @@ def scan_portal(source, old_by_id):
             row = client.parse_detail(org, detail_url, hint)
             status["details_fetched"] += 1
             if row:
-                found[row["tender_id"]] = merge_keep_good(old_by_id.get(row["tender_id"]), row)
+                found[row["tender_id"]] = merge_keep_good(found.get(row["tender_id"]), row)
         except Exception as exc:
             status["errors"].append(f"detail failed {detail_url}: {exc}")
             if old and old.get("tender_id"):
