@@ -10,7 +10,7 @@
     body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef3f8;color:#172033}
     .top{background:#17365d;color:#fff;border-bottom:4px solid #d4a029}
     .bar{max-width:1500px;margin:auto;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .brand b{font-size:22px;letter-spacing:.2px}.brand span{display:block;font-size:11px;color:#dbe7f4;margin-top:1px}
+    .brand{display:flex;align-items:center;gap:10px}.brand img{width:44px;height:44px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}.brand b{font-size:22px;letter-spacing:.2px}.brand span{display:block;font-size:11px;color:#dbe7f4;margin-top:1px}
     .live{font-size:11px;background:#ffffff1d;border:1px solid #ffffff38;border-radius:6px;padding:6px 9px;text-align:right}
     .wrap{width:100%;max-width:none;margin:0;padding:7px 12px}
     .tabs,.toolbar,.stats,.exportbar{display:flex;gap:8px;flex-wrap:wrap}
@@ -31,15 +31,17 @@
     .id{font-weight:800;color:#174f84;overflow-wrap:anywhere}.work{font-weight:700}.money{text-align:right;white-space:normal}.badge{display:inline-block;border-radius:999px;padding:3px 7px;font-size:11px;font-weight:700;background:#eaf2fb;color:#174f84}.badge.warn{background:#fff3cd;color:#805600}.badge.closed{background:#e9ecef;color:#5b6570}.corr{color:#8a5700;font-weight:700}.actions button{padding:5px 7px;margin:2px}
     .cards{display:none}.card{background:#fff;border:1px solid #d6e0eb;border-radius:6px;padding:10px;margin-bottom:9px}.card h3{font-size:14px;margin:8px 0;line-height:1.35}.cardgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;font-size:12px}.m{background:#f7fafc;border-radius:5px;padding:7px}.m span{display:block;color:#718096;font-size:10px;margin-bottom:3px}.empty{text-align:center;color:#667;padding:36px}
     .foot{text-align:center;color:#7a8796;font-size:11px;padding:22px}
+    .print-report{display:none}
     @media(max-width:900px){.brand b{font-size:21px}.bar{align-items:flex-start;flex-direction:column}.live{text-align:left}.stats{grid-template-columns:repeat(2,1fr)}.toolbar,.pacrow{grid-template-columns:1fr 1fr}.tablewrap{display:none}.cards{display:block}.wrap{padding:9px}.panel{padding:8px}.tabs button{flex:1;min-width:135px}.exportbar button{flex:1}.cardgrid{grid-template-columns:1fr 1fr}.column-panel.open{grid-template-columns:1fr 1fr}}
     @media(max-width:520px){.toolbar,.pacrow{grid-template-columns:1fr}.cardgrid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
-    @media print{.top,.panel,.statusline .right,.actions,.foot{display:none}.wrap{max-width:none;padding:0}.tablewrap{border:0;overflow:visible}table{min-width:0;font-size:10px}th{position:static}}
+    @page{size:A4 landscape;margin:9mm}
+    @media print{body{background:#fff;color:#111}.top,.tabs,.stats,.panel,.statusline,.tablewrap,.cards,.foot{display:none!important}.wrap{padding:0}.print-report{display:block}.print-title{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #17365d;padding-bottom:5px;margin-bottom:5px}.print-brand{display:flex;align-items:center;gap:8px}.print-brand img{width:42px;height:42px;object-fit:contain}.print-brand b{display:block;color:#17365d;font-size:18px}.print-brand span,.print-meta{font-size:8px;color:#4b5563}.print-meta{text-align:right}.print-summary{font-size:8px;margin:4px 0 7px}.print-report table{display:table;width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:7px}.print-report thead{display:table-header-group}.print-report tr{break-inside:avoid}.print-report th,.print-report td{position:static;border:1px solid #bfc9d4;padding:3px;overflow-wrap:anywhere}.print-report th{background:#e8f0f8;color:#17365d}.print-report .p-sn{width:3%}.print-report .p-area{width:9%}.print-report .p-org{width:15%}.print-report .p-id{width:11%}.print-report .p-work{width:25%}.print-report .p-money{width:9%;text-align:right}.print-report .p-end{width:11%}.print-report .p-status{width:8%}}
   </style>
 </head>
 <body>
   <header class="top">
     <div class="bar">
-      <div class="brand"><b>RSP Tender Monitor</b><span>Reliable, Secure & Perfect • Web parity with desktop v2.6.1</span></div>
+      <div class="brand"><img src="assets/rsp-logo.png" alt="RSP logo"><div><b>RSP Tender Monitor</b><span>Reliable, Secure & Perfect • Web parity with desktop v2.6.1</span></div></div>
       <div class="live" id="live">Loading tender cache...</div>
     </div>
   </header>
@@ -76,7 +78,7 @@
       </div>
       <div class="exportbar" style="margin-top:8px">
         <button class="ghost" onclick="exportExcel()">Excel / CSV</button>
-        <button class="ghost" onclick="window.print()">PDF / Print</button>
+        <button class="ghost" onclick="printReport()">PDF / Print</button>
         <button class="ghost" onclick="copyVisible()">Copy Visible</button>
         <button class="ghost" onclick="toggleColumns()">Columns</button>
         <button class="ghost" onclick="resetColumns()">Reset Columns</button>
@@ -93,10 +95,16 @@
       </table>
     </section>
     <section class="cards" id="cards"></section>
+    <section class="print-report" id="printReport">
+      <div class="print-title"><div class="print-brand"><img src="assets/rsp-logo.png" alt="RSP logo"><div><b>RSP Tender Monitor</b><span>Reliable, Secure &amp; Perfect</span></div></div><div class="print-meta" id="printMeta"></div></div>
+      <div class="print-summary" id="printSummary"></div>
+      <table><thead><tr><th class="p-sn">S.N.</th><th class="p-area">District / City</th><th class="p-org">Organisation / Unit</th><th class="p-id">Tender ID</th><th class="p-work">Name of Work</th><th class="p-money">PAC / Value</th><th class="p-money">EMD</th><th class="p-end">Bid End</th><th class="p-status">Status</th></tr></thead><tbody id="printBody"></tbody></table>
+    </section>
     <div class="foot">RSP Tender Monitor • Source baseline: Google Drive desktop v2.6.1 AREA_PARSER_FIX • No owner keygen/private licensing files are used in this public site.</div>
   </main>
   <script>
     let all=[],view=[],portal='MP',payload={}; const $=id=>document.getElementById(id);
+    if(location.search){history.replaceState(null,'',location.pathname+location.hash)}
     const COLS=[
       ['sn','S.N.'],['area','District / City'],['pin','Pincode'],['org','Organisation'],['unit','Organisation Unit'],['id','Tender ID'],['work','Name of Work'],['hi','Name of Work (Hindi)'],['nit','NIT Ref. No.'],['pac','PAC / Estimate / Tender Value'],['fee','Tender Fees'],['portal','Portal Fees'],['totalfee','Tender Fees with Portal Fees'],['emd','EMD Fee'],['payable','Total Payable Amount'],['pub','Published Date'],['end','Bid Submission End Date'],['left','Time Left / Status'],['corr','Change / Corrigendum'],['actions','Actions']
     ];
@@ -137,8 +145,9 @@
     function copyDetails(id){let t=all.find(x=>x.tender_id===id);if(t)navigator.clipboard.writeText(detailsText(t))}
     function copyVisible(){navigator.clipboard.writeText(view.map(detailsText).join('\n\n---\n\n'))}
     function openTender(url){if(url)window.open(url,'_blank','noopener')}
+    function printReport(){let filters=[portal==='MP'?'MP Tenders':'Coal India / NCL',$('area').value!=='ALL'?'District: '+$('area').value:'',$('org').value!=='ALL'?'Organisation: '+$('org').value:'',$('unit').value!=='ALL'?'Sub-organisation: '+$('unit').value:'',$('statusFilter').value!=='ALL'?'Status: '+$('statusFilter').value:'',$('q').value?'Search: '+$('q').value:''].filter(Boolean);$('printMeta').innerHTML=`Generated: ${esc(new Date().toLocaleString('en-IN'))}<br>Data updated: ${esc(payload.generated_at?new Date(payload.generated_at).toLocaleString('en-IN'):'—')}`;$('printSummary').textContent=filters.join(' | ')+' | '+view.length+' tenders';$('printBody').innerHTML=view.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(areaOf(t))}</td><td>${esc(orgName(t))}<br>${esc(t.org_unit||'')}</td><td><b>${esc(t.tender_id||'')}</b></td><td>${esc(t.work_en||'')}</td><td class="p-money">${money(t.pac)}</td><td class="p-money">${money(t.emd)}</td><td>${esc(t.bid_end||'')}</td><td>${esc(left(t))}</td></tr>`).join('');window.print()}
     function exportExcel(){let map={sn:['S.N.',(_r,i)=>i+1],area:['District / City',r=>areaOf(r)],pin:['Pincode',r=>r.pincode],org:['Organisation',r=>orgName(r)],unit:['Organisation Unit',r=>r.org_unit],id:['Tender ID',r=>r.tender_id],work:['Name of Work',r=>r.work_en],hi:['Name of Work (Hindi)',r=>r.work_hi],nit:['NIT Ref. No.',r=>r.nit_ref],pac:['PAC / Estimate / Tender Value',r=>r.pac],fee:['Tender Fees',r=>r.tender_fee],portal:['Portal Fees',r=>r.processing_fee],totalfee:['Tender Fees with Portal Fees',r=>r.total_fee],emd:['EMD Fee',r=>r.emd],payable:['Total Payable Amount',r=>r.total_payable],pub:['Published Date',r=>r.published_date],end:['Bid Submission End Date',r=>r.bid_end],left:['Time Left / Status',r=>left(r)],corr:['Change / Corrigendum',r=>Number(r.corrigendum_count||0)?(r.corrigendum_latest||'Corrigendum')+' ('+r.corrigendum_count+')':(r.is_new?'New':r.is_changed?'Changed':'')],actions:['URL',r=>r.detail_url]};let cols=COLS.map(x=>x[0]).filter(c=>enabledCols.includes(c)&&(c!=='hi'||$('showHindi').checked));let csv=[cols.map(c=>map[c][0]).join(',')].concat(view.map((r,i)=>cols.map(c=>'"'+String(map[c][1](r,i)??'').replace(/"/g,'""')+'"').join(','))).join('\n');let blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rsp-tenders-'+portal+'.csv';a.click();URL.revokeObjectURL(a.href)}
-    async function load(force=false){$('statusText').textContent='Loading tender cache...';try{let res=await fetch('data/tenders.json'+(force?'?t='+Date.now():''),{cache:force?'no-store':'default'});payload=await res.json();all=payload.tenders||[];$('hindiControl').hidden=!all.some(x=>String(x.work_hi||'').trim());initColumns();let when=payload.generated_at?new Date(payload.generated_at).toLocaleString('en-IN'):'waiting for first scan';$('live').textContent='Data updated: '+when;let st=payload.scan_status?.[portal]||{};$('statusText').textContent=(payload.errors?.length?'Scan warning: '+payload.errors.slice(0,2).join(' • '):'Auto-updated from public tender portals')+' • Base '+(payload.base_version||'');$('limitText').textContent=`${portal}: orgs ${st.organisations_scanned??0}/${st.organisations_total??0}, links ${st.links_found??0}, fetched ${st.details_fetched??0}, complete ${st.complete?'yes':'partial/cache-preserved'}`;fillFilters();render()}catch(e){$('statusText').textContent='Tender cache is not ready yet. Wait for the first automatic GitHub Actions scan.'}}
+    async function load(force=false){$('statusText').textContent='Loading tender cache...';try{let res=await fetch('data/tenders.json'+(force?'?t='+Date.now():''),{cache:force?'no-store':'default'});payload=await res.json();all=payload.tenders||[];$('hindiControl').hidden=!all.some(x=>String(x.work_hi||'').trim());initColumns();let when=payload.generated_at?new Date(payload.generated_at).toLocaleString('en-IN'):'waiting for first scan';$('live').textContent='Data updated: '+when;let st=payload.scan_status?.[portal]||{},continuing=!st.complete&&st.links_found>st.details_fetched;$('statusText').textContent=(continuing?'Latest available data shown; remaining portal records will continue in the next automatic refresh.':'Data updated automatically from public tender portals.')+' • Base '+(payload.base_version||'');$('limitText').textContent=`${portal}: ${st.organisations_scanned??0}/${st.organisations_total??0} organisations, ${st.links_found??0} tenders found, ${st.details_fetched??0} refreshed${st.complete?'':' (cache preserved)'}`;fillFilters();render()}catch(e){$('statusText').textContent='Tender data is temporarily unavailable. The next automatic refresh will retry.'}}
     initColumns();load();setInterval(()=>load(true),15*60*1000);
   </script>
 </body>
