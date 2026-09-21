@@ -326,6 +326,27 @@ def exact_value(soup, *labels):
     return ""
 
 
+def section_value(soup, section_name, label):
+    """Read a label only from the table immediately following a named section."""
+    heading = soup.find(
+        string=lambda value: isinstance(value, str)
+        and clean(value).casefold() == section_name.casefold()
+    )
+    if heading is None:
+        return ""
+    section_table = heading.find_parent("table")
+    table = section_table.find_next("table") if section_table else None
+    if table is None:
+        return ""
+    wanted = label.casefold()
+    for row in table.find_all("tr"):
+        cells = row.find_all(["td", "th"])
+        if len(cells) < 2 or clean(cells[0].get_text(" ", strip=True)).casefold() != wanted:
+            continue
+        return clean(cells[1].get_text(" ", strip=True))
+    return ""
+
+
 def all_portal_fields(soup):
     fields = {}
     for tr in soup.find_all("tr"):
@@ -620,7 +641,9 @@ class PortalClient:
         if not org_unit:
             org_unit = pv("Organisation Unit", "Organization Unit", "Office Name", "Department Name", "Division")
         if not org_unit:
-            org_unit = pv("Tender Inviting Authority Name", "Inviting Authority Name", "Name")
+            org_unit = section_value(soup, "Tender Inviting Authority", "Name")
+        if not org_unit:
+            org_unit = pv("Tender Inviting Authority Name", "Inviting Authority Name")
         if not org_unit:
             org_unit = location or bid_place
         project = ""
@@ -960,6 +983,9 @@ def enrich_counts(rows, old_by_id):
 
 
 def repair_organisation_names(rows):
+    known_units = {
+        "directorate sports and youth welfare": "DIRECTOR SPORTS AND YOUTH WELFARE",
+    }
     for row in rows:
         organisation = clean(row.get("organisation"))
         if not organisation:
@@ -972,7 +998,13 @@ def repair_organisation_names(rows):
         authority = clean(fields.get("Tender Inviting Authority Name") or fields.get("Inviting Authority Name") or fields.get("Name"))
         if authority.casefold() in {"name", "nil", "na", "n/a"}:
             authority = ""
-        fallback = authority or clean(row.get("location")) or clean(row.get("project"))
+        fallback = (
+            authority
+            or known_units.get(organisation.casefold(), "")
+            or clean(row.get("location"))
+            or clean(row.get("project"))
+            or organisation
+        )
         if fallback:
             row["org_unit"] = fallback
 
