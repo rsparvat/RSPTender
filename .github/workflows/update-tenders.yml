@@ -1,17 +1,21 @@
 name: Update Tender Data
+
 on:
   workflow_dispatch:
   schedule:
     - cron: '*/15 * * * *'
+
 permissions:
   contents: write
+
 concurrency:
   group: tender-refresh
-  cancel-in-progress: true
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,7 +24,15 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Fetch MP and Coal India tenders
-        timeout-minutes: 4
+        timeout-minutes: 13
+        env:
+          PORTAL_BUDGET_SECONDS: '360'
+          MAX_DETAIL_FETCH_PER_PORTAL: '900'
+          DETAIL_REFRESH_HOURS: '6'
+          CONNECT_TIMEOUT: '10'
+          READ_TIMEOUT: '45'
+          ORG_INDEX_READ_TIMEOUT: '75'
+          REQUEST_RETRIES: '3'
         run: python scraper.py
       - name: Commit refreshed cache
         run: |
@@ -28,4 +40,5 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add data/tenders.json
           git diff --cached --quiet || git commit -m 'Auto update tender data'
+          git pull --rebase
           git push
