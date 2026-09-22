@@ -9,8 +9,8 @@ on:
       - 'requirements.txt'
       - '.github/workflows/update-tenders.yml'
   schedule:
-    # Primary 15-minute refresh, offset from busy quarter-hour boundaries.
-    - cron: '7,22,37,52 * * * *'
+    # Frequent off-boundary attempts reduce the impact of delayed/dropped GitHub schedules.
+    - cron: '2,12,22,32,42,52 * * * *'
 
 permissions:
   contents: write
