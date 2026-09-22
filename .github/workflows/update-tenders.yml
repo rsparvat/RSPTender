@@ -9,7 +9,8 @@ on:
       - 'requirements.txt'
       - '.github/workflows/update-tenders.yml'
   schedule:
-    - cron: '*/15 * * * *'
+    # Offset from busy quarter-hour boundaries to reduce GitHub scheduler delays.
+    - cron: '7,22,37,52 * * * *'
 
 permissions:
   contents: write
