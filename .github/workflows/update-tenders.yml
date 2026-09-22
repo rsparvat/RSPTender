@@ -8,6 +8,7 @@ on:
       - 'scraper.py'
       - 'requirements.txt'
       - '.github/workflows/update-tenders.yml'
+      - '.github/workflows/refresh-loop.yml'
   schedule:
     # Frequent off-boundary attempts reduce the impact of delayed/dropped GitHub schedules.
     - cron: '2,12,22,32,42,52 * * * *'
