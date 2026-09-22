@@ -1,0 +1,69 @@
+name: Tender Data Freshness Watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Independent fallback twice per hour. It scans only when data is over 45 minutes old.
+    - cron: '3,33 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tender-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-if-stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check cache age
+        id: freshness
+        shell: python
+        run: |
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          with open("data/tenders.json", encoding="utf-8") as handle:
+              generated = json.load(handle).get("generated_at", "")
+          try:
+              updated = datetime.fromisoformat(generated.replace("Z", "+00:00"))
+              age_minutes = (datetime.now(timezone.utc) - updated).total_seconds() / 60
+          except (TypeError, ValueError):
+              age_minutes = 9999
+          stale = age_minutes >= 45
+          print(f"Tender cache age: {age_minutes:.1f} minutes; stale={stale}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"stale={'true' if stale else 'false'}\n")
+      - uses: actions/setup-python@v5
+        if: steps.freshness.outputs.stale == 'true'
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install scraper dependencies
+        if: steps.freshness.outputs.stale == 'true'
+        run: pip install -r requirements.txt
+      - name: Fetch MP and Coal India tenders
+        if: steps.freshness.outputs.stale == 'true'
+        timeout-minutes: 17
+        env:
+          PORTAL_BUDGET_SECONDS: '360'
+          MAX_DETAIL_FETCH_PER_PORTAL: '900'
+          DETAIL_REFRESH_HOURS: '6'
+          CONNECT_TIMEOUT: '10'
+          READ_TIMEOUT: '45'
+          ORG_INDEX_READ_TIMEOUT: '75'
+          REQUEST_RETRIES: '3'
+        run: python scraper.py
+      - name: Commit refreshed cache
+        if: steps.freshness.outputs.stale == 'true'
+        run: |
+          git config user.name 'RSP Tender Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add data/tenders.json
+          git diff --cached --quiet || git commit -m 'Watchdog refresh tender data'
+          git pull --rebase
+          git push
