@@ -1,0 +1,24 @@
+{
+  "name": "RSP Tender Monitor",
+  "short_name": "RSP Tender",
+  "description": "Madhya Pradesh and Coal India tender monitor",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef3f8",
+  "theme_color": "#17365d",
+  "icons": [
+    {
+      "src": "assets/rsp-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/rsp-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
