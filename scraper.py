@@ -1052,7 +1052,14 @@ def scan_portal(source, old_by_id):
         status["organisations_total"] = len(orgs)
     except Exception as exc:
         status["errors"].append(f"organisation index failed: {exc}")
-        return [], status
+        cached = [
+            merge_keep_good(row, {})
+            for row in old_by_id.values()
+            if row.get("source") == source and row.get("tender_id")
+        ]
+        status["kept_from_cache"] = len(cached)
+        status["finished_at"] = datetime.now(timezone.utc).isoformat()
+        return cached, status
 
     links = []
     for org, org_url in orgs:
