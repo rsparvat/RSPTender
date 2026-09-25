@@ -216,7 +216,7 @@
         let suffix=force?'?t='+Date.now():'',[res,placesRes]=await Promise.all([fetch('data/tenders.json'+suffix,{cache:force?'no-store':'default'}),fetch('data/mp_places.json'+suffix,{cache:force?'no-store':'default'}).catch(()=>null)]);
         payload=await res.json();
         if(placesRes?.ok){let placePayload=await placesRes.json();mpPlaces=placePayload.districts||{};buildMpPlaceIndex()}
-        all=payload.tenders||[];initColumns();
+        all=(payload.tenders||[]).map(t=>{let strip=v=>String(v||'').replace(/^(\s*\[[^\]]*\]\s*)+/,'').trim();for(let k of ['organisation','organisation_short','org_unit'])if(/^\s*\[/.test(t[k]||''))t[k]=strip(t[k]);return t});initColumns();
         let updated=payload.generated_at?new Date(payload.generated_at):null,when=updated?updated.toLocaleString('en-IN'):'waiting for first scan',overdue=updated&&Date.now()-updated.getTime()>60*60*1000;
         $('live').textContent=(uiLang==='hi'?(overdue?'डेटा अपडेट विलंबित • ':'डेटा अपडेट: '):(overdue?'Refresh overdue • ':'Data updated: '))+when;$('live').classList.toggle('overdue',!!overdue);
         $('statusText').textContent='';$('limitText').textContent='';fillFilters();restoreView();
