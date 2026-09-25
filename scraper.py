@@ -476,21 +476,37 @@ class PortalClient:
     def organisation_links(self):
         soup = self.soup(self.profile["org"], read_timeout=ORG_INDEX_READ_TIMEOUT)
         out = []
+        # The organisation table rows look like: <td>S.No</td><td>Organisation</td><td><a DirectLink>count</a></td>.
+        # Read only a row's own cells, so outer layout rows (which contain the whole table) are ignored.
         for tr in soup.find_all("tr"):
+            tds = tr.find_all("td", recursive=False)
+            if len(tds) < 3 or not re.fullmatch(r"\d+", clean(tds[0].get_text(" ", strip=True))):
+                continue
             a = tr.find("a", href=True)
-            if not a:
+            if not a or "directlink" not in a["href"].casefold():
                 continue
-            href = a["href"]
-            if not any(
-                token in href.casefold()
-                for token in ("frontendtendersbyorganisation", "tendersbyorganisation", "service=direct")
-            ):
-                continue
-            values = [clean(c.get_text(" ", strip=True)) for c in tr.find_all("td")]
-            values = [v for v in values if v]
-            org = values[1] if len(values) >= 2 else (values[0] if values else "")
+            org = clean(tds[1].get_text(" ", strip=True))
             if org and not re.fullmatch(r"[\d\s./-]+", org):
-                out.append((org, urljoin(self.profile["base"], href)))
+                out.append((org, urljoin(self.profile["base"], a["href"])))
+        if not out:
+            # Fallback to the older, looser parser if the portal layout changes.
+            for tr in soup.find_all("tr"):
+                if tr.find("tr"):
+                    continue
+                a = tr.find("a", href=True)
+                if not a:
+                    continue
+                href = a["href"]
+                if "component=clear" in href.casefold() or not any(
+                    token in href.casefold()
+                    for token in ("frontendtendersbyorganisation", "tendersbyorganisation", "service=direct")
+                ):
+                    continue
+                values = [clean(c.get_text(" ", strip=True)) for c in tr.find_all("td")]
+                values = [v for v in values if v]
+                org = values[1] if len(values) >= 2 else (values[0] if values else "")
+                if org and not re.fullmatch(r"[\d\s./-]+", org):
+                    out.append((org, urljoin(self.profile["base"], href)))
         seen, uniq = set(), []
         for item in out:
             if item[1] not in seen:
