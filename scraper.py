@@ -942,22 +942,43 @@ def priority(source, org, hint, old):
     return (0, 2)
 
 
+def strip_bracket_prefix(value):
+    """Remove leading "[...]" blocks (e.g. a Tender ID) glued to an organisation name."""
+    return clean(re.sub(r"^(?:\s*\[[^\]]*\]\s*)+", "", clean(value)))
+
+
+def parse_listing_hint(hint):
+    """Split a listing row's "[Title] [Ref No][Tender ID] Org||Unit" text.
+
+    The Ref No can be identical to the Tender ID ("[ID][ID]"), so the LAST
+    bracketed Tender ID marks the end of the title/ref blocks.
+    """
+    hint = hint or ""
+    matches = list(re.finditer(r"\[\s*(20\d{2}_[A-Za-z0-9]+_\d+_\d+)\s*\]", hint))
+    if not matches:
+        plain = re.search(r"\b20\d{2}_[A-Za-z0-9]+_\d+_\d+\b", hint)
+        return (plain.group(0) if plain else "", "", "", [])
+    last = matches[-1]
+    tender_id = last.group(1)
+    head = hint[:last.start()]
+    blocks = [clean(value) for value in re.findall(r"\[([^\]]*)\]", head)]
+    nit_ref = blocks[-1] if blocks else ""
+    work = blocks[-2] if len(blocks) >= 2 else ""
+    tail = strip_bracket_prefix(hint[last.end():])
+    chain = [clean(value) for value in tail.split("||") if clean(value)]
+    return tender_id, work, nit_ref, chain
+
+
 def row_from_listing(source, org, detail_url, hint):
     """Create a usable record from an organisation-list row before detail enrichment."""
     id_match = re.search(r"\b20\d{2}_[A-Za-z0-9]+_\d+_\d+\b", hint)
     if not id_match:
         return None
-    tender_id = id_match.group(0)
-    blocks = [clean(value) for value in re.findall(r"\[([^\]]*)\]", hint)]
-    id_index = next((i for i, value in enumerate(blocks) if value == tender_id), -1)
-    work = blocks[id_index - 2] if id_index >= 2 else ""
-    nit_ref = blocks[id_index - 1] if id_index >= 1 else ""
+    tender_id, work, nit_ref, chain = parse_listing_hint(hint)
     dates = re.findall(r"\d{1,2}-[A-Za-z]{3}-\d{4}\s+\d{1,2}:\d{2}\s+[AP]M", hint, re.I)
     published = dates[0] if dates else ""
     bid_end = dates[1] if len(dates) > 1 else ""
-    tail = clean(hint[id_match.end():]).lstrip("] ")
-    chain = [clean(value) for value in tail.split("||") if clean(value)]
-    organisation = chain[0] if chain else clean(org)
+    organisation = chain[0] if chain else strip_bracket_prefix(org)
     org_unit = " > ".join(chain[1:]) if len(chain) > 1 else organisation
     row = {
         "tender_id": tender_id,
@@ -1165,6 +1186,24 @@ def repair_organisation_names(rows):
         "directorate sports and youth welfare": "DIRECTOR SPORTS AND YOUTH WELFARE",
     }
     for row in rows:
+        hint = row.get("listing_row_hint") or ""
+        if (
+            clean(row.get("organisation")).startswith("[")
+            or not clean(row.get("work_en"))
+            or clean(row.get("work_en")) == clean(row.get("nit_ref"))
+        ):
+            _, work, nit_ref, chain = parse_listing_hint(hint)
+            if chain and clean(row.get("organisation")).startswith("["):
+                row["organisation"] = chain[0]
+            if work and not clean(row.get("work_en")):
+                row["work_en"] = work
+            if work and nit_ref and clean(row.get("nit_ref")) == work and nit_ref != work:
+                row["nit_ref"] = nit_ref
+        for key in ("organisation", "org_unit"):
+            if clean(row.get(key)).startswith("["):
+                row[key] = strip_bracket_prefix(row.get(key))
+        if clean(row.get("organisation_short")).startswith("[") or not clean(row.get("organisation_short")):
+            row["organisation_short"] = organisation_short(row.get("organisation"))
         organisation = clean(row.get("organisation"))
         if not organisation:
             organisation = clean(row.get("source_name")) or ("Coal India" if row.get("source") == "COAL" else "MP Tenders")
