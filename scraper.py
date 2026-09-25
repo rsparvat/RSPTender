@@ -1044,6 +1044,9 @@ def merge_listing(old_row, listing_row):
         "listing_row_hint",
     )
     update = {key: listing_row.get(key) for key in update_keys}
+    if clean(update.get("work_en")) == clean(update.get("nit_ref")) and clean(old_row.get("work_en")):
+        # The listing title is only the NIT number here; keep the detail page's Work Description.
+        update.pop("work_en", None)
     if not clean(old_row.get("org_unit")):
         update["org_unit"] = listing_row.get("org_unit")
     if not clean(old_row.get("project")):
@@ -1199,6 +1202,13 @@ def repair_organisation_names(rows):
                 row["work_en"] = work
             if work and nit_ref and clean(row.get("nit_ref")) == work and nit_ref != work:
                 row["nit_ref"] = nit_ref
+        fields = row.get("portal_fields") if isinstance(row.get("portal_fields"), dict) else {}
+        description = clean(fields.get("Work Description"))
+        if description and clean(row.get("work_en")) == clean(row.get("nit_ref")) and description != clean(row.get("nit_ref")):
+            row["work_en"] = description
+            row["work_hi"] = ""
+        if row.get("pac") == 0:
+            row["pac"] = None
         for key in ("organisation", "org_unit"):
             if clean(row.get(key)).startswith("["):
                 row[key] = strip_bracket_prefix(row.get(key))
