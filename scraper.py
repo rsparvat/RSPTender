@@ -1074,6 +1074,7 @@ def scan_portal(source, old_by_id):
     try:
         orgs = client.organisation_links()
         status["organisations_total"] = len(orgs)
+        status["organisation_names"] = sorted({clean(name) for name, _ in orgs if clean(name)}, key=str.casefold)
     except Exception as exc:
         status["errors"].append(f"organisation index failed: {exc}")
         cached = [
