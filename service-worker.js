@@ -1,4 +1,4 @@
-const CACHE_NAME = "rsp-tender-shell-v4";
+const CACHE_NAME = "rsp-tender-shell-v5";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./assets/rsp-logo.png", "./assets/rsp-icon-192.png", "./assets/rsp-icon-512.png", "./assets/whatsapp.svg"];
 
 self.addEventListener("install", event => {
@@ -25,5 +25,20 @@ self.addEventListener("fetch", event => {
         return response;
       })
       .catch(() => caches.match(event.request).then(response => response || caches.match("./index.html")))
+  );
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || "./", self.registration.scope).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+      const client = list.find(c => new URL(c.url).origin === self.location.origin);
+      if (client) {
+        client.postMessage({ type: "rsp-open", url });
+        return client.focus();
+      }
+      return self.clients.openWindow(url);
+    })
   );
 });
