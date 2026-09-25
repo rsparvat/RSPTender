@@ -1,4 +1,4 @@
-const CACHE_NAME = "rsp-tender-shell-v3";
+const CACHE_NAME = "rsp-tender-shell-v4";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./assets/rsp-logo.png", "./assets/rsp-icon-192.png", "./assets/rsp-icon-512.png", "./assets/whatsapp.svg"];
 
 self.addEventListener("install", event => {
@@ -14,7 +14,7 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
+  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     fetch(event.request)
       .then(response => {
