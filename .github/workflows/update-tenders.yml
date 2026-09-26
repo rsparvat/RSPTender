@@ -24,7 +24,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 28
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,11 +43,26 @@ jobs:
           ORG_INDEX_READ_TIMEOUT: '75'
           REQUEST_RETRIES: '3'
         run: python scraper.py
+      - name: Send favourite tender alerts
+        # Web Push to subscribers whose favourite districts / organisations got
+        # new or closing-soon tenders. Never blocks the data refresh.
+        continue-on-error: true
+        timeout-minutes: 8
+        env:
+          PUSH_API: https://script.google.com/macros/s/AKfycbz8DOoxFFaLOJOI2NsnbrN7kH7MAdBkjxtxEYcJJ56PA7B2xMun7SjWN3VUMTm5Aw/exec
+          PUSH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: |
+          if [ -z "$VAPID_PRIVATE_KEY" ] || [ -z "$PUSH_TOKEN" ]; then echo "push secrets not set"; exit 0; fi
+          pip install pywebpush playwright
+          python -m playwright install --with-deps chromium
+          python push_notify.py
       - name: Commit refreshed cache
         run: |
           git config user.name 'RSP Tender Bot'
           git config user.email 'actions@users.noreply.github.com'
           git add data/tenders.json
+          if [ -f data/push_state.json ]; then git add data/push_state.json; fi
           git diff --cached --quiet || git commit -m 'Auto update tender data'
           git pull --rebase
           git push
