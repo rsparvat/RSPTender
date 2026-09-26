@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>RSP Push Keys</title>
+<style>
+  :root{--bg:#eef3f8;--ink:#172033;--card:#fff;--line:#d6e0eb;--brand:#17365d}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink)}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  h1{font-size:20px;color:var(--brand)}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin:12px 0}
+  label{display:block;font-weight:700;margin-bottom:6px}
+  textarea{width:100%;box-sizing:border-box;font-family:monospace;font-size:13px;min-height:54px;padding:8px;border:1px solid var(--line);border-radius:6px}
+  button{background:var(--brand);color:#fff;border:0;border-radius:6px;padding:10px 16px;font-weight:700;font-size:15px;cursor:pointer}
+  p.note{font-size:13px;color:#475569;line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+  <h1>RSP Tender Monitor – Push keys</h1>
+  <p class="note">Ye keys aapke apne browser me banti hain, kahin bheji nahi jati. Private key aur Token sirf GitHub Secrets / Apps Script me daalein, kisi ko na bhejein. Public key bhejna safe hai.</p>
+  <button id="gen" type="button">Keys banaiye</button>
+  <div class="box"><label>1. VAPID_PRIVATE_KEY (GitHub secret – private, kisi ko na bhejein)</label><textarea id="priv" readonly></textarea></div>
+  <div class="box"><label>2. PUSH_TOKEN (GitHub secret + Apps Script property – private)</label><textarea id="tok" readonly></textarea></div>
+  <div class="box"><label>3. VAPID public key (ye Claude ko bhej dijiye – safe)</label><textarea id="pub" readonly></textarea></div>
+</main>
+<script>
+  const b64u = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const fromB64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+  document.getElementById('gen').addEventListener('click', async () => {
+    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+    const pub = new Uint8Array(65);
+    pub[0] = 4; pub.set(fromB64u(jwk.x), 1); pub.set(fromB64u(jwk.y), 33);
+    document.getElementById('priv').value = jwk.d;
+    document.getElementById('pub').value = b64u(pub);
+    document.getElementById('tok').value = b64u(crypto.getRandomValues(new Uint8Array(24)));
+  });
+</script>
+</body>
+</html>
