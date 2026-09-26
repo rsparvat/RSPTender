@@ -1,4 +1,4 @@
-const CACHE_NAME = "rsp-tender-shell-v5";
+const CACHE_NAME = "rsp-tender-shell-v6";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./assets/rsp-logo.png", "./assets/rsp-icon-192.png", "./assets/rsp-icon-512.png", "./assets/whatsapp.svg"];
 
 self.addEventListener("install", event => {
@@ -39,6 +39,21 @@ self.addEventListener("notificationclick", event => {
         return client.focus();
       }
       return self.clients.openWindow(url);
+    })
+  );
+});
+
+self.addEventListener("push", event => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = { body: event.data ? event.data.text() : "" }; }
+  event.waitUntil(
+    self.registration.showNotification(d.title || "RSP Tender Monitor", {
+      body: d.body || "",
+      icon: "assets/rsp-icon-192.png",
+      badge: "assets/rsp-icon-192.png",
+      tag: d.tag || "rsp-tender",
+      renotify: true,
+      data: { url: d.url || "./" }
     })
   );
 });
