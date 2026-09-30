@@ -1039,6 +1039,35 @@ def row_from_listing(source, org, detail_url, hint):
     return row
 
 
+DATE_RE = re.compile(r"\d{1,2}-[A-Za-z]{3}-\d{4}\s+\d{1,2}:\d{2}\s+[AP]M", re.I)
+
+
+def apply_listing_dates(row, hint):
+    """The organisation list on the portal is what users see and is fetched fresh every run.
+    Detail pages sometimes return a wrong date, so the list's dates always win."""
+    if not row or not hint:
+        return row
+    dates = [clean(x) for x in DATE_RE.findall(hint)]
+    if len(dates) < 2:
+        return row
+    pub, end = parse_dt(dates[0]), parse_dt(dates[1])
+    if not pub or not end or end < pub:
+        return row
+    row["published_date"], row["published_iso"] = dates[0], iso_dt(dates[0])
+    row["bid_end"], row["bid_end_iso"] = dates[1], iso_dt(dates[1])
+    row.pop("pending_backward_bid_end", None)
+    pf = row.get("portal_fields")
+    if isinstance(pf, dict) and pf:
+        pf["Published Date"] = dates[0]
+        pf["Bid Submission End Date"] = dates[1]
+        if "Document Download / Sale End Date" in pf:
+            pf["Document Download / Sale End Date"] = dates[1]
+        if len(dates) > 2 and parse_dt(dates[2]):
+            pf["Bid Opening Date"] = dates[2]
+    row["status"] = status_for(row)
+    return row
+
+
 def merge_listing(old_row, listing_row):
     if not old_row:
         return listing_row
@@ -1153,6 +1182,11 @@ def scan_portal(source, old_by_id):
             status["errors"].append(f"detail failed {detail_url}: {exc}")
             if old and old.get("tender_id"):
                 found[old["tender_id"]] = merge_keep_good(old, {})
+
+    for org, detail_url, hint, old in uniq:
+        m = re.search(r"\b20\d{2}_[A-Za-z0-9]+_\d+_\d+\b", hint)
+        if m and m.group(0) in found:
+            apply_listing_dates(found[m.group(0)], hint)
 
     for old in old_by_id.values():
         if old.get("source") == source and old.get("tender_id") not in found:
