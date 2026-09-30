@@ -1042,28 +1042,43 @@ def row_from_listing(source, org, detail_url, hint):
 DATE_RE = re.compile(r"\d{1,2}-[A-Za-z]{3}-\d{4}\s+\d{1,2}:\d{2}\s+[AP]M", re.I)
 
 
-def apply_listing_dates(row, hint):
-    """The organisation list on the portal is what users see and is fetched fresh every run.
-    Detail pages sometimes return a wrong date, so the list's dates always win."""
+def apply_listing_dates(row, hint, listed=True):
+    """The organisation list on the portal shows: start date, closing date, opening date.
+    It is what users see, and detail pages sometimes return a wrong date, so the
+    closing / opening dates from the list always win. The list has no Published Date;
+    it can only be checked (a tender is never published after its start date)."""
     if not row or not hint:
         return row
     dates = [clean(x) for x in DATE_RE.findall(hint)]
     if len(dates) < 2:
         return row
-    pub, end = parse_dt(dates[0]), parse_dt(dates[1])
-    if not pub or not end or end < pub:
+    start, end = parse_dt(dates[0]), parse_dt(dates[1])
+    if not start or not end or end < start:
         return row
-    row["published_date"], row["published_iso"] = dates[0], iso_dt(dates[0])
-    row["bid_end"], row["bid_end_iso"] = dates[1], iso_dt(dates[1])
-    row.pop("pending_backward_bid_end", None)
+    pf0 = row.get("portal_fields") if isinstance(row.get("portal_fields"), dict) else {}
+    pf_end = parse_dt(pf0.get("Bid Submission End Date"))
+    has_date_corrigendum = any("date" in str(c.get("type", "")).lower() for c in (row.get("corrigenda") or []) if isinstance(c, dict))
+    extended_after_listing = (
+        not listed and has_date_corrigendum and pf_end and pf_end > end and parse_dt(row.get("bid_end")) == pf_end
+    )
+    if extended_after_listing:
+        # A tender that already left the portal list keeps a genuine corrigendum extension.
+        end_text = clean(row.get("bid_end"))
+    else:
+        end_text = dates[1]
+        row["bid_end"], row["bid_end_iso"] = dates[1], iso_dt(dates[1])
+        row.pop("pending_backward_bid_end", None)
+    published = parse_dt(row.get("published_date"))
+    if published is None or published > start:
+        row["published_date"], row["published_iso"] = dates[0], iso_dt(dates[0])
     pf = row.get("portal_fields")
     if isinstance(pf, dict) and pf:
-        pf["Published Date"] = dates[0]
-        pf["Bid Submission End Date"] = dates[1]
+        pf["Bid Submission End Date"] = end_text
         if "Document Download / Sale End Date" in pf:
-            pf["Document Download / Sale End Date"] = dates[1]
+            pf["Document Download / Sale End Date"] = end_text
         if len(dates) > 2 and parse_dt(dates[2]):
             pf["Bid Opening Date"] = dates[2]
+        pf["Published Date"] = row.get("published_date") or pf.get("Published Date", "")
     row["status"] = status_for(row)
     return row
 
@@ -1183,16 +1198,20 @@ def scan_portal(source, old_by_id):
             if old and old.get("tender_id"):
                 found[old["tender_id"]] = merge_keep_good(old, {})
 
-    for org, detail_url, hint, old in uniq:
-        m = re.search(r"\b20\d{2}_[A-Za-z0-9]+_\d+_\d+\b", hint)
-        if m and m.group(0) in found:
-            apply_listing_dates(found[m.group(0)], hint)
-
     for old in old_by_id.values():
         if old.get("source") == source and old.get("tender_id") not in found:
             if status["errors"] or status["details_fetched"] >= MAX_DETAIL_FETCH_PER_PORTAL:
                 found[old["tender_id"]] = merge_keep_good(old, {})
                 status["kept_from_cache"] += 1
+
+    # Every row (also tenders that already left the portal list) keeps the list's dates.
+    listed_ids = set()
+    for _org, _url, _hint, _old in uniq:
+        _m = re.search(r"\b20\d{2}_[A-Za-z0-9]+_\d+_\d+\b", _hint)
+        if _m:
+            listed_ids.add(_m.group(0))
+    for tid, row in found.items():
+        apply_listing_dates(row, row.get("listing_row_hint", ""), listed=tid in listed_ids)
 
     status["complete"] = (
         not status["errors"]
