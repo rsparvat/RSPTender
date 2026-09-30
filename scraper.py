@@ -1213,6 +1213,22 @@ def scan_portal(source, old_by_id):
     for tid, row in found.items():
         apply_listing_dates(row, row.get("listing_row_hint", ""), listed=tid in listed_ids)
 
+    # The organisation lists are the portal's live tender list. When every list was read
+    # without error, a tender missing from them for two runs in a row was withdrawn,
+    # cancelled or closed on the portal, so it is removed instead of staying "active".
+    list_errors = [e for e in status["errors"] if not e.startswith(("portal time budget reached while reading tender details", "detail failed"))]
+    if status["organisations_total"] and status["organisations_scanned"] == status["organisations_total"] and not list_errors:
+        status["removed_from_portal"] = 0
+        for tid in list(found):
+            row = found[tid]
+            if tid in listed_ids:
+                row.pop("missing_runs", None)
+                continue
+            row["missing_runs"] = int(row.get("missing_runs") or 0) + 1
+            if row["missing_runs"] >= 2:
+                del found[tid]
+                status["removed_from_portal"] += 1
+
     status["complete"] = (
         not status["errors"]
         and status["organisations_scanned"] == status["organisations_total"]
