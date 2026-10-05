@@ -936,21 +936,35 @@ TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
 TRANSLATE_BUDGET_SECONDS = int(os.environ.get("TRANSLATE_BUDGET_SECONDS", "120"))
 
 
-def google_hindi_batch(texts):
-    """Translate several work names in one request; returns a list (blank where unsure)."""
-    joined = "\n".join(t.replace("\n", " ") for t in texts)
+TRANSLATE_DIAG = {"http_errors": [], "line_mismatch": 0, "single_used": 0}
+
+
+def google_hindi_raw(text):
     res = requests.get(
         TRANSLATE_URL,
-        params={"client": "gtx", "sl": "en", "tl": "hi", "dt": "t", "q": joined},
+        params={"client": "gtx", "sl": "en", "tl": "hi", "dt": "t", "q": text},
         headers={"User-Agent": UA},
         timeout=(CONNECT_TIMEOUT, 20),
     )
-    res.raise_for_status()
+    if res.status_code != 200:
+        raise RuntimeError(f"HTTP {res.status_code}")
     data = res.json()
-    out = "".join(seg[0] for seg in (data[0] or []) if seg and seg[0])
-    lines = [x.strip() for x in out.split("\n")]
+    return "".join(seg[0] for seg in (data[0] or []) if seg and seg[0])
+
+
+def google_hindi_batch(texts):
+    """Translate several work names in one request; returns a list (blank where unsure)."""
+    texts = [t.replace("\n", " ") for t in texts]
+    out = google_hindi_raw("\n".join(texts))
+    lines = [x.strip() for x in out.split("\n") if x.strip()]
     if len(lines) != len(texts):
-        return [""] * len(texts)
+        # Lines got merged or split: translate these one by one instead.
+        TRANSLATE_DIAG["line_mismatch"] += 1
+        lines = []
+        for t in texts:
+            TRANSLATE_DIAG["single_used"] += 1
+            lines.append(google_hindi_raw(t).strip())
+            time.sleep(0.2)
     return [valid_hindi_text(h, e) for h, e in zip(lines, texts)]
 
 
@@ -980,8 +994,11 @@ def add_hindi_translations(rows, old_rows):
         try:
             hindi = google_hindi_batch([clean(r["work_en"]) for r in batch])
             errors = 0
-        except Exception:
+        except Exception as exc:
             errors += 1
+            if len(TRANSLATE_DIAG["http_errors"]) < 5:
+                TRANSLATE_DIAG["http_errors"].append(f"{type(exc).__name__}: {exc}"[:160])
+            time.sleep(2)
             continue
         for row, hi in zip(batch, hindi):
             if hi:
@@ -993,6 +1010,7 @@ def add_hindi_translations(rows, old_rows):
         "translated_this_run": done,
         "have_hindi": sum(1 for row in rows if row.get("work_hi")),
         "remaining": sum(1 for row in rows if row.get("work_en") and not row.get("work_hi")),
+        "diagnostics": TRANSLATE_DIAG,
     }
 
 
