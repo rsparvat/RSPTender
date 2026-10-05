@@ -932,15 +932,67 @@ def translate_hindi(text):
     return (result, "") if replacements and valid_hindi_text(result, text) else ("", "no_glossary_match")
 
 
-def add_hindi_translations(rows, _old_rows):
+TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
+TRANSLATE_BUDGET_SECONDS = int(os.environ.get("TRANSLATE_BUDGET_SECONDS", "120"))
+
+
+def google_hindi_batch(texts):
+    """Translate several work names in one request; returns a list (blank where unsure)."""
+    joined = "\n".join(t.replace("\n", " ") for t in texts)
+    res = requests.get(
+        TRANSLATE_URL,
+        params={"client": "gtx", "sl": "en", "tl": "hi", "dt": "t", "q": joined},
+        headers={"User-Agent": UA},
+        timeout=(CONNECT_TIMEOUT, 20),
+    )
+    res.raise_for_status()
+    data = res.json()
+    out = "".join(seg[0] for seg in (data[0] or []) if seg and seg[0])
+    lines = [x.strip() for x in out.split("\n")]
+    if len(lines) != len(texts):
+        return [""] * len(texts)
+    return [valid_hindi_text(h, e) for h, e in zip(lines, texts)]
+
+
+def add_hindi_translations(rows, old_rows):
+    """Give every tender a Hindi work name (work_hi) once; translations are kept across runs."""
+    cache = {}
+    for row in old_rows or []:
+        hi = valid_hindi_text(row.get("work_hi"), row.get("work_en"))
+        if hi and row.get("work_en"):
+            cache[normalize_translation_key(row["work_en"])] = hi
+    todo = []
     for row in rows:
-        row["work_hi"] = ""
-        row["work_hi_method"] = ""
+        key = normalize_translation_key(row.get("work_en"))
+        row["work_hi"] = cache.get(key, "") if key else ""
+        row["work_hi_method"] = "google" if row["work_hi"] else ""
+        if key and not row["work_hi"]:
+            todo.append(row)
+    # Open tenders first, soonest closing first.
+    todo.sort(key=lambda r: (r.get("status") == "Closed", parse_dt(r.get("bid_end")) or datetime.max))
+    start, done, errors, i = time.monotonic(), 0, 0, 0
+    while i < len(todo) and time.monotonic() - start < TRANSLATE_BUDGET_SECONDS and errors < 3:
+        batch, size = [], 0
+        while i < len(todo) and len(batch) < 20 and size + len(todo[i]["work_en"]) < 1500:
+            batch.append(todo[i]); size += len(todo[i]["work_en"]) + 1; i += 1
+        if not batch:
+            batch.append(todo[i]); i += 1
+        try:
+            hindi = google_hindi_batch([clean(r["work_en"]) for r in batch])
+            errors = 0
+        except Exception:
+            errors += 1
+            continue
+        for row, hi in zip(batch, hindi):
+            if hi:
+                row["work_hi"], row["work_hi_method"] = hi, "google"
+                done += 1
+        time.sleep(0.3)
     return {
-        "method": "disabled_until_verified",
-        "translated": 0,
-        "remaining": sum(1 for row in rows if row.get("work_en")),
-        "network_translation": False,
+        "method": "google_cached",
+        "translated_this_run": done,
+        "have_hindi": sum(1 for row in rows if row.get("work_hi")),
+        "remaining": sum(1 for row in rows if row.get("work_en") and not row.get("work_hi")),
     }
 
 
@@ -950,6 +1002,9 @@ def priority(source, org, hint, old):
         return (0, 0)
     if source == "MP" and any(x in text for x in ("singrauli", "waidhan", "baidhan", "486886")):
         return (0, 1)
+    if old and not old.get("detail_fetched"):
+        # Listed earlier but its detail page (PAC, fees, EMD) was never read: read it first.
+        return (0, 3)
     if old:
         bid_end = parse_dt(old.get("bid_end"))
         if bid_end and bid_end > datetime.now():
@@ -1322,6 +1377,29 @@ def repair_organisation_names(rows):
             row["org_unit"] = fallback
 
 
+# Only these detail-page fields are used by the website, the alerts or this scraper.
+# The portal page has hundreds of other label/value pairs (fee tables, bank lists,
+# footer text); keeping them made data/tenders.json several times bigger and slower.
+PORTAL_FIELDS_KEEP = {
+    "Organisation Chain", "Tender Reference Number", "Tender ID", "Tender Type", "Form of contract",
+    "Tender Category", "Product Category", "Sub category", "Sub Category", "Contract Type",
+    "Tender Value in ₹", "Location", "Pincode", "Bid Opening Place", "Period Of Work(Days)",
+    "Work Description", "Title", "Pre Bid Meeting Place", "Pre Bid Meeting Date",
+    "Published Date", "Bid Opening Date", "Document Download / Sale Start Date",
+    "Document Download / Sale End Date", "Clarification Start Date", "Clarification End Date",
+    "Bid Submission Start Date", "Bid Submission End Date", "Name", "Address",
+    "Inviting Authority Name", "Tender Inviting Authority Name",
+    "EMD Amount in ₹", "Tender Fee in ₹", "Processing Fee in ₹",
+}
+
+
+def slim_portal_fields(rows):
+    for row in rows:
+        fields = row.get("portal_fields")
+        if isinstance(fields, dict):
+            row["portal_fields"] = {k: v for k, v in fields.items() if k in PORTAL_FIELDS_KEEP}
+
+
 def main():
     os.makedirs(os.path.dirname(DATA_PATH) or ".", exist_ok=True)
     old_rows = load_old()
@@ -1348,6 +1426,7 @@ def main():
     repair_organisation_names(rows)
     translation_status = add_hindi_translations(rows, old_rows)
     counts = enrich_counts(rows, old_by_id)
+    slim_portal_fields(rows)
     errors = [f"{src}: {err}" for src, st in scan_status.items() for err in st.get("errors", [])]
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
