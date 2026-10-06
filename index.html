@@ -96,7 +96,7 @@
     <div class="tabs">
       <button id="tabMP" class="active" onclick="setPortal('MP')">MP Tenders</button>
       <button id="tabCOAL" onclick="setPortal('COAL')">Coal India / NCL</button>
-      <a class="tabsite tabguide" href="https://rsparvat.com/start/" target="_blank" rel="noopener">📘 ठेकेदार गाइड</a>
+      <a id="tabGuide" class="tabsite tabguide" href="https://rsparvat.com/start/" target="_blank" rel="noopener">📘 ठेकेदार गाइड</a>
     </div>
     <section class="stats">
       <div class="stat"><span>Active</span><b id="sActive">0</b></div>
@@ -187,7 +187,7 @@
       let x=UI[uiLang];
       setControlLabel('q',x.search);setControlLabel('area',x.area);setControlLabel('statusFilter',x.status);setControlLabel('org',x.org);setControlLabel('unit',x.unit);setControlLabel('orgMode',x.display);setControlLabel('sort',x.sort);setControlLabel('pacPreset',x.pac);
       $('q').placeholder=uiLang==='hi'?'🔍 निविदा खोजें: सड़क, PWD...':'🔍 Search tenders: road, PWD...';$('q').setAttribute('aria-label',x.search);$('area').placeholder=uiLang==='hi'?'📍 जिला / शहर':'📍 District / City';$('area').setAttribute('aria-label',x.area);
-      $('tabMP').textContent=uiLang==='hi'?'मध्य प्रदेश निविदाएं':'MP Tenders';$('tabCOAL').textContent=uiLang==='hi'?'कोल इंडिया / NCL':'Coal India / NCL';
+      $('tabMP').textContent=uiLang==='hi'?'मध्य प्रदेश निविदाएं':'MP Tenders';$('tabCOAL').textContent=uiLang==='hi'?'कोल इंडिया / NCL':'Coal India / NCL';if($('tabGuide'))$('tabGuide').textContent=uiLang==='hi'?'📘 ठेकेदार गाइड':'📘 Contractor Guide';
       [['sActive','active'],['sVisible','visible'],['sToday','today'],['sSoon','soon'],['sNew','changed'],['sCorr','corr']].forEach(([id,key])=>$(id).previousElementSibling.textContent=x[key]);
       document.querySelector('.reload').textContent=x.reload;document.querySelector('[onclick="copyVisible()"]' ).textContent=x.copy;document.querySelector('[onclick="toggleColumns()"]' ).textContent=x.columns;document.querySelector('[onclick="resetColumns()"]' ).textContent=x.reset;document.querySelector('.whatsapp-contact span').textContent=x.contact;
       document.querySelectorAll('th[data-col]').forEach(th=>th.textContent=columnLabel(th.dataset.col));
