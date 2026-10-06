@@ -932,40 +932,35 @@ def translate_hindi(text):
     return (result, "") if replacements and valid_hindi_text(result, text) else ("", "no_glossary_match")
 
 
-TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
-TRANSLATE_BUDGET_SECONDS = int(os.environ.get("TRANSLATE_BUDGET_SECONDS", "120"))
+# Hindi work names come from the owner's Google Apps Script (Google's LanguageApp).
+# Google Translate's public endpoint refuses GitHub's servers (HTTP 429).
+TRANSLATE_API = os.environ.get(
+    "TRANSLATE_API",
+    "https://script.google.com/macros/s/AKfycbz8DOoxFFaLOJOI2NsnbrN7kH7MAdBkjxtxEYcJJ56PA7B2xMun7SjWN3VUMTm5Aw/exec",
+)
+TRANSLATE_BUDGET_SECONDS = int(os.environ.get("TRANSLATE_BUDGET_SECONDS", "150"))
+TRANSLATE_DIAG = {"errors": [], "calls": 0}
 
 
-TRANSLATE_DIAG = {"http_errors": [], "line_mismatch": 0, "single_used": 0}
-
-
-def google_hindi_raw(text):
-    res = requests.get(
-        TRANSLATE_URL,
-        params={"client": "gtx", "sl": "en", "tl": "hi", "dt": "t", "q": text},
-        headers={"User-Agent": UA},
-        timeout=(CONNECT_TIMEOUT, 20),
+def google_hindi_batch(texts):
+    """Translate several work names in one Apps Script call; returns a list (blank where unsure)."""
+    texts = [clean(t).replace("\n", " ") for t in texts]
+    TRANSLATE_DIAG["calls"] += 1
+    res = requests.post(
+        TRANSLATE_API,
+        data=json.dumps({"action": "translate", "texts": texts}),
+        headers={"Content-Type": "text/plain;charset=utf-8", "User-Agent": UA},
+        timeout=(CONNECT_TIMEOUT, 90),
     )
     if res.status_code != 200:
         raise RuntimeError(f"HTTP {res.status_code}")
     data = res.json()
-    return "".join(seg[0] for seg in (data[0] or []) if seg and seg[0])
-
-
-def google_hindi_batch(texts):
-    """Translate several work names in one request; returns a list (blank where unsure)."""
-    texts = [t.replace("\n", " ") for t in texts]
-    out = google_hindi_raw("\n".join(texts))
-    lines = [x.strip() for x in out.split("\n") if x.strip()]
-    if len(lines) != len(texts):
-        # Lines got merged or split: translate these one by one instead.
-        TRANSLATE_DIAG["line_mismatch"] += 1
-        lines = []
-        for t in texts:
-            TRANSLATE_DIAG["single_used"] += 1
-            lines.append(google_hindi_raw(t).strip())
-            time.sleep(0.2)
-    return [valid_hindi_text(h, e) for h, e in zip(lines, texts)]
+    if data.get("error"):
+        raise RuntimeError(str(data["error"])[:150])
+    hindi = data.get("hi") or []
+    if len(hindi) != len(texts):
+        raise RuntimeError(f"got {len(hindi)} of {len(texts)}")
+    return [valid_hindi_text(h, e) for h, e in zip(hindi, texts)]
 
 
 def add_hindi_translations(rows, old_rows):
@@ -987,7 +982,7 @@ def add_hindi_translations(rows, old_rows):
     start, done, errors, i = time.monotonic(), 0, 0, 0
     while i < len(todo) and time.monotonic() - start < TRANSLATE_BUDGET_SECONDS and errors < 3:
         batch, size = [], 0
-        while i < len(todo) and len(batch) < 20 and size + len(todo[i]["work_en"]) < 1500:
+        while i < len(todo) and len(batch) < 50 and size + len(todo[i]["work_en"]) < 4000:
             batch.append(todo[i]); size += len(todo[i]["work_en"]) + 1; i += 1
         if not batch:
             batch.append(todo[i]); i += 1
@@ -996,8 +991,8 @@ def add_hindi_translations(rows, old_rows):
             errors = 0
         except Exception as exc:
             errors += 1
-            if len(TRANSLATE_DIAG["http_errors"]) < 5:
-                TRANSLATE_DIAG["http_errors"].append(f"{type(exc).__name__}: {exc}"[:160])
+            if len(TRANSLATE_DIAG["errors"]) < 5:
+                TRANSLATE_DIAG["errors"].append(f"{type(exc).__name__}: {exc}"[:160])
             time.sleep(2)
             continue
         for row, hi in zip(batch, hindi):
@@ -1006,7 +1001,7 @@ def add_hindi_translations(rows, old_rows):
                 done += 1
         time.sleep(0.3)
     return {
-        "method": "google_cached",
+        "method": "apps_script_cached",
         "translated_this_run": done,
         "have_hindi": sum(1 for row in rows if row.get("work_hi")),
         "remaining": sum(1 for row in rows if row.get("work_en") and not row.get("work_hi")),
