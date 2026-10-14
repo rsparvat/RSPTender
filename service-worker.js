@@ -1,4 +1,4 @@
-const CACHE_NAME = "rsp-tender-shell-v7";
+const CACHE_NAME = "rsp-tender-shell-v8";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./assets/rsp-icon-192.png", "./assets/rsp-icon-512.png", "./assets/whatsapp.svg"];
 
 self.addEventListener("install", event => {
