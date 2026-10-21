@@ -163,7 +163,7 @@ a{{color:#111;text-decoration:none}}.none{{text-align:center;font-size:14px;marg
 <div class="ttl">{e(title)}</div></div>
 {table}
 <div class="join">डेटा अपडेट: {e(upd)} · पूरी लाइव लिस्ट: <a href="{SITE}">tenders.rsparvat.com</a> · रोज़ लिस्ट पाने के लिए जुड़ें:
-<a href="{WA_GROUP}">WhatsApp ग्रुप</a> · <a href="{WA_CHANNEL}">WhatsApp चैनल</a> · <a href="{TG_CHANNEL}">Telegram @TenderAlert</a><br>🖊️ <b>RSP PDF Sign Compress</b> – टेंडर दस्तावेज़ों पर DSC से साइन, PDF कम्प्रेस व मर्ज करें (30 दिन मुफ़्त): <a href="{PDF_TOOL}">rsparvat.com/rsp-pdf-sign-compress</a><br>🔐 <b>DSC खरीदें / Buy DSC</b> – 5 मिनट में अप्रूवल: <a href="{BUY_DSC}">यहाँ क्लिक करें / Click here</a></div>
+<a href="{WA_GROUP}">WhatsApp ग्रुप</a> · <a href="{WA_CHANNEL}">WhatsApp चैनल</a> · <a href="{TG_CHANNEL}">Telegram @TenderAlert</a><br>🖊️ <b>RSP PDF Sign Compress</b> – टेंडर दस्तावेज़ों पर DSC से साइन, PDF कम्प्रेस व मर्ज करें: <a href="{PDF_TOOL}">rsparvat.com/rsp-pdf-sign-compress</a><br>🔐 <b>DSC खरीदें / Buy DSC</b> – 5 मिनट में अप्रूवल: <a href="{BUY_DSC}">यहाँ क्लिक करें / Click here</a></div>
 </body></html>"""
 
 
@@ -236,7 +236,7 @@ def main():
     write_pdfs([(os.path.join(OUT_DIR, f[0]), build_html(f[1], f[2], f[3], f[4], f[5], upd)) for f in files])
     log(f"Singrauli MP: today {len(mp_today)}, all {len(mp)} | NCL: today {len(ncl_today)}, all {len(ncl)}")
 
-    links = f"\n\nपूरी लाइव लिस्ट: {SITE}\nWhatsApp ग्रुप: {WA_GROUP}\nWhatsApp चैनल: {WA_CHANNEL}\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज (30 दिन मुफ़्त): {PDF_TOOL}\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): {BUY_DSC}\n– रमाशंकर पर्वत (9752318084)"
+    links = f"\n\nपूरी लाइव लिस्ट: {SITE}\nWhatsApp ग्रुप: {WA_GROUP}\nWhatsApp चैनल: {WA_CHANNEL}\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: {PDF_TOOL}\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): {BUY_DSC}\n– रमाशंकर पर्वत (9752318084)"
     captions = [
         f"📅 आज ({day}) अंतिम तिथि – MP टेंडर, सिंगरौली जिला: {len(mp_today)}",
         f"📋 सभी चालू MP टेंडर – सिंगरौली जिला ({day}): {len(mp)}",
