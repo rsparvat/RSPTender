@@ -36,6 +36,7 @@ PDF_TOOL = "https://rsparvat.com/rsp-pdf-sign-compress/"
 BUY_DSC = "https://secure.certificate.digital/web/dsc/referral/?bp=TE2WF5ODCDo="
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 ALL_PDF_START = datetime.date(2026, 10, 22)  # "Sabhi" PDFs are posted on this day and every 4th day after
+MAX_DATA_AGE_H = 4  # tender data older than this -> no PDFs (see main)
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_IDS = [c.strip() for c in (os.environ.get("TELEGRAM_CHAT_IDS", "").strip() or "@TenderAlert").split(",") if c.strip()]
 
@@ -163,7 +164,7 @@ a{{color:#111;text-decoration:none}}.none{{text-align:center;font-size:14px;marg
 <div class="ttl">{e(title)}</div></div>
 {table}
 <div class="join">डेटा अपडेट: {e(upd)} · पूरी लाइव लिस्ट: <a href="{SITE}">tenders.rsparvat.com</a> · रोज़ लिस्ट पाने के लिए जुड़ें:
-<a href="{WA_GROUP}">WhatsApp ग्रुप</a> · <a href="{WA_CHANNEL}">WhatsApp चैनल</a> · <a href="{TG_CHANNEL}">Telegram @TenderAlert</a><br>🖊️ <b>RSP PDF Sign Compress</b> – टेंडर दस्तावेज़ों पर DSC से साइन, PDF कम्प्रेस व मर्ज करें: <a href="{PDF_TOOL}">rsparvat.com/rsp-pdf-sign-compress</a><br>🔐 <b>DSC खरीदें / Buy DSC</b> – 5 मिनट में अप्रूवल: <a href="{BUY_DSC}">यहाँ क्लिक करें / Click here</a></div>
+<a href="{WA_GROUP}">WhatsApp ग्रुप</a> · <a href="{TG_CHANNEL}">Telegram @TenderAlert</a><br>🖊️ <b>RSP PDF Sign Compress</b> – टेंडर दस्तावेज़ों पर DSC से साइन, PDF कम्प्रेस व मर्ज करें: <a href="{PDF_TOOL}">rsparvat.com/rsp-pdf-sign-compress</a><br>🔐 <b>DSC खरीदें / Buy DSC</b> – 5 मिनट में अप्रूवल: <a href="{BUY_DSC}">यहाँ क्लिक करें / Click here</a></div>
 </body></html>"""
 
 
@@ -216,6 +217,17 @@ def main():
         upd = datetime.datetime.fromisoformat(generated.replace("Z", "+00:00")).astimezone(IST).strftime("%d-%b-%Y %I:%M %p")
     except Exception:
         upd = ""
+    # Never publish a "today" list from old data: if the tender data was not refreshed
+    # in the last few hours, stop here (old PDFs stay, nothing is posted, the run fails
+    # so GitHub sends an email, and the pages show "today's list is not ready").
+    try:
+        age_h = (datetime.datetime.now(datetime.timezone.utc)
+                 - datetime.datetime.fromisoformat(generated.replace("Z", "+00:00"))).total_seconds() / 3600
+    except Exception:
+        age_h = 999
+    if age_h > MAX_DATA_AGE_H:
+        log(f"tender data is {age_h:.1f} h old (limit {MAX_DATA_AGE_H} h) - no PDFs made, nothing posted")
+        return 1
     rows.sort(key=lambda r: (r["endMs"], r["org"], r["id"]))
     mp = [r for r in rows if r["src"] == "MP"]
     ncl = [r for r in rows if r["src"] == "COAL"]
@@ -239,7 +251,7 @@ def main():
     write_pdfs([(os.path.join(OUT_DIR, f[0]), build_html(f[1], f[2], f[3], f[4], f[5], upd)) for f in files])
     log(f"Singrauli MP: today {len(mp_today)}, all {len(mp)} | NCL: today {len(ncl_today)}, all {len(ncl)}")
 
-    links = f"\n\nपूरी लाइव लिस्ट: {SITE}\nWhatsApp ग्रुप: {WA_GROUP}\nWhatsApp चैनल: {WA_CHANNEL}\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: {PDF_TOOL}\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): {BUY_DSC}\n– रमाशंकर पर्वत (9752318084)"
+    links = f"\n\nपूरी लाइव लिस्ट: {SITE}\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: {PDF_TOOL}\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): {BUY_DSC}\n– रमाशंकर पर्वत (9752318084)"
     captions = [
         f"📅 आज ({day}) अंतिम तिथि – MP टेंडर, सिंगरौली जिला: {len(mp_today)}",
         f"📋 सभी लाइव टेंडर (MP Portal) सिंगरौली जिला ({day}): {len(mp)}",
@@ -252,6 +264,12 @@ def main():
     send = [(f, cap) for f, cap in zip(files, captions)
             if f[1] and (f[0].endswith("_Today.pdf") or all_day)]
     log("posting:", ", ".join(f[0] for f, _ in send) or "nothing", "| all-tenders day:", all_day)
+    # For share.html (send the same PDFs + text to WhatsApp from the phone).
+    with open(os.path.join(OUT_DIR, "today.json"), "w", encoding="utf-8") as fh:
+        json.dump({"date": day, "iso": now.date().isoformat(), "data_at": upd, "all_day": all_day, "links": links.strip(),
+                   "items": [{"file": f[0], "name": f[6], "count": len(f[1]), "caption": cap,
+                              "send": bool(f[1]) and (f[0].endswith("_Today.pdf") or all_day)}
+                             for f, cap in zip(files, captions)]}, fh, ensure_ascii=False, indent=1)
     for k, (f, cap) in enumerate(send):
         telegram_send(os.path.join(OUT_DIR, f[0]), f[6], cap + (links if k == len(send) - 1 else ""))
     if not BOT_TOKEN:
