@@ -3,10 +3,10 @@
 Every morning (GitHub Actions) this makes four PDFs in the same layout as the
 "TENDER LIST BY RAMASHANKAR PARVAT (RSP)" lists:
 
-  data/pdf/Singrauli_MP_Aaj.pdf    MP Tenders, Singrauli district, last date today
-  data/pdf/Singrauli_MP_Sabhi.pdf  MP Tenders, Singrauli district, all open tenders
-  data/pdf/NCL_Aaj.pdf             Coal India - NCL, last date today
-  data/pdf/NCL_Sabhi.pdf           Coal India - NCL, all open tenders
+  data/pdf/Singrauli_MP_Today.pdf  MP Tenders, Singrauli district, last date today
+  data/pdf/Singrauli_MP_Live.pdf   MP Tenders, Singrauli district, all live tenders
+  data/pdf/NCL_Today.pdf           Coal India - NCL, last date today
+  data/pdf/NCL_Live.pdf            Coal India - NCL, all live tenders
 
   -> https://tenders.rsparvat.com/data/pdf/<name>.pdf
 
@@ -224,30 +224,33 @@ def main():
     mp_head = "Organisation: Multiple Organisations | District / City: Singrauli"
     ncl_head = "Company: Northern Coalfields Limited | Project: Multiple Districts / Cities"
     files = [
-        ("Singrauli_MP_Aaj.pdf", mp_today, MP_COLS, mp_head, f"आज अंतिम तिथि वाले टेंडर / Last Date Today: {day} · कुल {len(mp_today)}",
-         "आज सिंगरौली जिले के किसी MP टेंडर की अंतिम तिथि नहीं है।", f"MP_Tenders_Singrauli_Aaj_{stamp}.pdf"),
-        ("Singrauli_MP_Sabhi.pdf", mp, MP_COLS, mp_head, f"सभी चालू टेंडर / All Open Tenders · {day} · कुल {len(mp)}",
-         "अभी सिंगरौली जिले का कोई चालू MP टेंडर नहीं है।", f"MP_Tenders_Singrauli_All_{stamp}.pdf"),
-        ("NCL_Aaj.pdf", ncl_today, NCL_COLS, ncl_head, f"आज अंतिम तिथि वाले टेंडर / Last Date Today: {day} · कुल {len(ncl_today)}",
-         "आज NCL के किसी टेंडर की अंतिम तिथि नहीं है।", f"NCL_Tenders_Aaj_{stamp}.pdf"),
-        ("NCL_Sabhi.pdf", ncl, NCL_COLS, ncl_head, f"सभी चालू टेंडर / All Open Tenders · {day} · कुल {len(ncl)}",
-         "अभी NCL का कोई चालू टेंडर नहीं है।", f"NCL_Tenders_All_{stamp}.pdf"),
+        ("Singrauli_MP_Today.pdf", mp_today, MP_COLS, mp_head, f"आज अंतिम तिथि वाले टेंडर / Last Date Today: {day} · कुल {len(mp_today)}",
+         "आज सिंगरौली जिले के किसी MP टेंडर की अंतिम तिथि नहीं है।", f"MP_Tenders_Singrauli_Today_{stamp}.pdf"),
+        ("Singrauli_MP_Live.pdf", mp, MP_COLS, mp_head, f"सभी लाइव टेंडर (MP Portal) सिंगरौली जिला / All Live Tenders · {day} · कुल {len(mp)}",
+         "अभी सिंगरौली जिले का कोई लाइव MP टेंडर नहीं है।", f"MP_Tenders_Singrauli_All_{stamp}.pdf"),
+        ("NCL_Today.pdf", ncl_today, NCL_COLS, ncl_head, f"आज अंतिम तिथि वाले टेंडर / Last Date Today: {day} · कुल {len(ncl_today)}",
+         "आज NCL के किसी टेंडर की अंतिम तिथि नहीं है।", f"NCL_Tenders_Today_{stamp}.pdf"),
+        ("NCL_Live.pdf", ncl, NCL_COLS, ncl_head, f"सभी लाइव टेंडर (NCL) / All Live Tenders · {day} · कुल {len(ncl)}",
+         "अभी NCL का कोई लाइव टेंडर नहीं है।", f"NCL_Tenders_All_{stamp}.pdf"),
     ]
+    for old in ("Singrauli_MP_Aaj.pdf", "Singrauli_MP_Sabhi.pdf", "NCL_Aaj.pdf", "NCL_Sabhi.pdf"):  # old names (before 22-Oct-2026)
+        if os.path.exists(os.path.join(OUT_DIR, old)):
+            os.remove(os.path.join(OUT_DIR, old))
     write_pdfs([(os.path.join(OUT_DIR, f[0]), build_html(f[1], f[2], f[3], f[4], f[5], upd)) for f in files])
     log(f"Singrauli MP: today {len(mp_today)}, all {len(mp)} | NCL: today {len(ncl_today)}, all {len(ncl)}")
 
     links = f"\n\nपूरी लाइव लिस्ट: {SITE}\nWhatsApp ग्रुप: {WA_GROUP}\nWhatsApp चैनल: {WA_CHANNEL}\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: {PDF_TOOL}\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): {BUY_DSC}\n– रमाशंकर पर्वत (9752318084)"
     captions = [
         f"📅 आज ({day}) अंतिम तिथि – MP टेंडर, सिंगरौली जिला: {len(mp_today)}",
-        f"📋 सभी चालू MP टेंडर – सिंगरौली जिला ({day}): {len(mp)}",
+        f"📋 सभी लाइव टेंडर (MP Portal) सिंगरौली जिला ({day}): {len(mp)}",
         f"📅 आज ({day}) अंतिम तिथि – NCL टेंडर: {len(ncl_today)}",
-        f"📋 सभी चालू NCL टेंडर ({day}): {len(ncl)}",
+        f"📋 सभी लाइव टेंडर (NCL) ({day}): {len(ncl)}",
     ]
     # "Aaj" PDFs go out every day; the "Sabhi" (all open tenders) PDFs every 4th day.
     # All four files are refreshed on the website every day either way.
     all_day = (now.date() - ALL_PDF_START).days % 4 == 0 or os.environ.get("SEND_ALL_PDF") == "1"
     send = [(f, cap) for f, cap in zip(files, captions)
-            if f[1] and (f[0].endswith("_Aaj.pdf") or all_day)]
+            if f[1] and (f[0].endswith("_Today.pdf") or all_day)]
     log("posting:", ", ".join(f[0] for f, _ in send) or "nothing", "| all-tenders day:", all_day)
     for k, (f, cap) in enumerate(send):
         telegram_send(os.path.join(OUT_DIR, f[0]), f[6], cap + (links if k == len(send) - 1 else ""))
