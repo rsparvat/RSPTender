@@ -55,18 +55,31 @@ async function share(items){
   }catch(e){if(e&&e.name==='AbortError')return;console.log(e)}
   await copy(text);toast('इस ब्राउज़र में सीधा शेयर नहीं हुआ – टेक्स्ट कॉपी हो गया, PDF अलग से डाउनलोड करें')}
 async function copy(t){try{await navigator.clipboard.writeText(t);toast('टेक्स्ट कॉपी हो गया')}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove();toast('टेक्स्ट कॉपी हो गया')}}
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';let pdfjsP=null;const shots={};
+function pdfjs(){return pdfjsP||(pdfjsP=new Promise((ok,no)=>{const s=document.createElement('script');s.src=PDFJS+'pdf.min.js';s.onload=()=>{pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js';ok(pdfjsLib)};s.onerror=()=>{pdfjsP=null;no(new Error('pdf.js'))};document.head.appendChild(s)}))}
+async function photoFiles(i){if(shots[i.file])return shots[i.file];const lib=await pdfjs(),doc=await lib.getDocument({url:'data/pdf/'+i.file+'?t='+Date.now(),cMapUrl:PDFJS+'cmaps/',cMapPacked:true}).promise,base=i.name.replace(/\.pdf$/i,''),out=[];
+  for(let p=1;p<=doc.numPages;p++){const page=await doc.getPage(p),vp=page.getViewport({scale:2}),c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);await page.render({canvasContext:ctx,viewport:vp}).promise;
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.88));out.push(new File([blob],`${base}${doc.numPages>1?'_page-'+p:''}.jpg`,{type:'image/jpeg'}))}
+  return shots[i.file]=out}
+async function sharePhotos(k,btn){const i=data.items[k],label='🖼️ फोटो';
+  if(!shots[i.file]){btn.disabled=true;btn.textContent='⏳ बन रही है';try{await photoFiles(i)}catch(e){console.log(e);toast('फोटो नहीं बन पाई');btn.disabled=false;btn.textContent=label;return}btn.disabled=false;btn.textContent=label}
+  const files=shots[i.file];
+  try{if(navigator.canShare&&navigator.canShare({files})){await navigator.share({files,text:textFor([i])});return}}
+  catch(e){if(e&&e.name==='AbortError')return;if(e&&e.name==='NotAllowedError'){btn.textContent='📤 फोटो भेजें';toast('फोटो तैयार हैं – भेजने के लिए बटन फिर दबाएँ');return}console.log(e)}
+  for(const f of files){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();await new Promise(r=>setTimeout(r,400))}
+  toast('फोटो डाउनलोड हो गईं')}
 function draw(){
   $('day').textContent=data.date+(data.all_day?' · आज "सभी लाइव" वाली PDF भी भेजनी हैं':'');
   $('list').innerHTML=data.items.map((i,k)=>`<div class="card${i.count?'':' off'}"><h3>${esc(i.caption.split('\n')[0])}${i.send?'<span class="tag">आज भेजें</span>':''}</h3>
   <div class="meta">📄 ${esc(i.name)}${i.count?'':' · आज कोई टेंडर नहीं'}</div>
-  <div class="btns"><button class="wa" data-k="${k}" ${i.count?'':'disabled'}>📤 WhatsApp</button><button data-copy="${k}">📋 टेक्स्ट</button><a class="btn" href="data/pdf/${encodeURIComponent(i.file)}" download="${esc(i.name)}">⬇️ PDF</a></div></div>`).join('');
+  <div class="btns"><button class="wa" data-k="${k}" ${i.count?'':'disabled'}>📤 WhatsApp</button><button data-img="${k}" ${i.count?'':'disabled'}>🖼️ फोटो</button><a class="btn" href="data/pdf/${encodeURIComponent(i.file)}" download="${esc(i.name)}">⬇️ PDF</a></div></div>`).join('');
   const send=data.items.filter(i=>i.send);$('allBtn').disabled=!send.length;$('allBtn').textContent=send.length?`📤 आज की ${send.length} PDF एक साथ भेजें`:'आज भेजने के लिए कोई PDF नहीं';
-  if(!canFiles()){$('msg').className='note err';$('msg').textContent='यह पेज फ़ोन के Chrome में खोलें – वहीं से PDF और विवरण सीधे WhatsApp में जाते हैं। यहाँ “टेक्स्ट” बटन से विवरण कॉपी और “PDF” से डाउनलोड कर सकते हैं।'}
+  if(!canFiles()){$('msg').className='note err';$('msg').textContent='यह पेज फ़ोन के Chrome में खोलें – वहीं से PDF और विवरण सीधे WhatsApp में जाते हैं। यहाँ “PDF” बटन से डाउनलोड कर सकते हैं।'}
 }
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!data)return;
   if(b.id==='allBtn')share(data.items.filter(i=>i.send));
   else if(b.dataset.k!==undefined)share([data.items[+b.dataset.k]]);
-  else if(b.dataset.copy!==undefined)copy(textFor([data.items[+b.dataset.copy]]))});
+  else if(b.dataset.img!==undefined)sharePhotos(+b.dataset.img,b)});
 fetch('data/pdf/today.json?t='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{const ist=new Date(Date.now()+19800000),today=ist.toISOString().slice(0,10);if(d.iso!==today){const early=ist.getUTCHours()<7;$('day').textContent='';document.querySelectorAll('#allBtn,.opt,#msg').forEach(e=>e.style.display='none');$('list').innerHTML='<div class="note err" style="background:#fde8e8;border:1px solid #e7a1a1;border-radius:8px;padding:10px 12px">'+(early?'⏳ आज की टेंडर लिस्ट अभी नहीं आई है। कृपया थोड़ी देर बाद खोलें।':'⏳ आज की टेंडर लिस्ट अभी तैयार नहीं हुई है। कृपया थोड़ी देर बाद दोबारा खोलें।')+'</div>';return}data=d;draw()})
   .catch(()=>{$('day').textContent='';$('msg').className='note err';$('msg').textContent='आज की PDF जानकारी नहीं मिली। कृपया थोड़ी देर बाद दोबारा खोलें।'});
 </script>
