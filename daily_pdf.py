@@ -34,6 +34,9 @@ WA_CHANNEL = "https://whatsapp.com/channel/0029Va6CjFn90x2yklf3rd3a"
 TG_CHANNEL = "https://t.me/TenderAlert"
 PDF_TOOL = "https://rsparvat.com/rsp-pdf-sign-compress/"
 BUY_DSC = "https://secure.certificate.digital/web/dsc/referral/?bp=TE2WF5ODCDo="
+# Click-counted short links (rsparvat.com/go/<name>?s=<where the click came from>)
+def go(name, src):
+    return f"https://rsparvat.com/go/{name}?s={src}"
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 ALL_PDF_START = datetime.date(2026, 10, 22)  # "Sabhi" PDFs are posted on this day and every 4th day after
 MAX_DATA_AGE_H = 4  # tender data older than this -> no PDFs (see main)
@@ -159,12 +162,12 @@ a{{color:#111;text-decoration:none}}.none{{text-align:center;font-size:14px;marg
 </style></head><body>
 <div class="top"><img src="data:image/png;base64,{LOGO}"><h1>TENDER LIST BY RAMASHANKAR PARVAT (RSP)</h1>
 <div class="tag">Reliable, Secure &amp; Perfect</div><div class="hd">{e(heading)}</div>
-<div class="ct">Contact: Ramashankar Parvat | Mob/WhatsApp: 9752318084 | Email: rsparvat@gmail.com | Website: rsparvat.com</div>
+<div class="ct">Contact: Ramashankar Parvat | Mob/WhatsApp: 9752318084 | Email: rsparvat@gmail.com | Website: <a href="{go('site', 'pdf')}">rsparvat.com</a></div>
 <div class="warn">इस सूची को अंतिम या पूर्णतः सही न मानें। संबंधित आधिकारिक पोर्टल से मिलान अवश्य करें।</div>
 <div class="ttl">{e(title)}</div></div>
 {table}
-<div class="join">डेटा अपडेट: {e(upd)} · पूरी लाइव लिस्ट: <a href="{SITE}">tenders.rsparvat.com</a> · रोज़ लिस्ट पाने के लिए जुड़ें:
-<a href="{WA_GROUP}">WhatsApp ग्रुप</a> · <a href="{TG_CHANNEL}">Telegram @TenderAlert</a><br>🖊️ <b>RSP PDF Sign Compress</b> – टेंडर दस्तावेज़ों पर DSC से साइन, PDF कम्प्रेस व मर्ज करें: <a href="{PDF_TOOL}">rsparvat.com/rsp-pdf-sign-compress</a><br>🔐 <b>DSC खरीदें / Buy DSC</b> – 5 मिनट में अप्रूवल: <a href="{BUY_DSC}">यहाँ क्लिक करें / Click here</a></div>
+<div class="join">डेटा अपडेट: {e(upd)} · पूरी लाइव लिस्ट: <a href="{go('tm', 'pdf')}">tenders.rsparvat.com</a> · रोज़ लिस्ट पाने के लिए जुड़ें:
+<a href="{WA_GROUP}">WhatsApp ग्रुप</a> · <a href="{TG_CHANNEL}">Telegram @TenderAlert</a><br>🖊️ <b>RSP PDF Sign Compress</b> – टेंडर दस्तावेज़ों पर DSC से साइन, PDF कम्प्रेस व मर्ज करें: <a href="{go('pdf', 'pdf')}">rsparvat.com/rsp-pdf-sign-compress</a><br>🔐 <b>DSC खरीदें / Buy DSC</b> – 5 मिनट में अप्रूवल: <a href="{go('dscbuy', 'pdf')}">यहाँ क्लिक करें / Click here</a></div>
 </body></html>"""
 
 
@@ -251,7 +254,11 @@ def main():
     write_pdfs([(os.path.join(OUT_DIR, f[0]), build_html(f[1], f[2], f[3], f[4], f[5], upd)) for f in files])
     log(f"Singrauli MP: today {len(mp_today)}, all {len(mp)} | NCL: today {len(ncl_today)}, all {len(ncl)}")
 
-    links = f"\n\n🌐 वेबसाइट: https://rsparvat.com\nपूरी लाइव लिस्ट: {SITE}\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: {PDF_TOOL}\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): {BUY_DSC}\n– रमाशंकर पर्वत (9752318084)"
+    def link_text(src):  # tg = Telegram caption, wa = WhatsApp (share.html)
+        return (f"\n\n🌐 वेबसाइट: {go('site', src)}\nपूरी लाइव लिस्ट: {go('tm', src)}\n\n"
+                f"🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: {go('pdf', src)}\n"
+                f"🔐 DSC खरीदें (5 मिनट में अप्रूवल): {go('dscbuy', src)}\n– रमाशंकर पर्वत (9752318084)")
+    links = link_text("tg")
     captions = [
         f"📅 आज ({day}) अंतिम तिथि – MP टेंडर, सिंगरौली जिला: {len(mp_today)}",
         f"📋 सभी लाइव टेंडर (MP Portal) सिंगरौली जिला ({day}): {len(mp)}",
@@ -266,7 +273,7 @@ def main():
     log("posting:", ", ".join(f[0] for f, _ in send) or "nothing", "| all-tenders day:", all_day)
     # For share.html (send the same PDFs + text to WhatsApp from the phone).
     with open(os.path.join(OUT_DIR, "today.json"), "w", encoding="utf-8") as fh:
-        json.dump({"date": day, "iso": now.date().isoformat(), "data_at": upd, "all_day": all_day, "links": links.strip(),
+        json.dump({"date": day, "iso": now.date().isoformat(), "data_at": upd, "all_day": all_day, "links": link_text("wa").strip(),
                    "items": [{"file": f[0], "name": f[6], "count": len(f[1]), "caption": cap,
                               "send": bool(f[1]) and (f[0].endswith("_Today.pdf") or all_day)}
                              for f, cap in zip(files, captions)]}, fh, ensure_ascii=False, indent=1)
