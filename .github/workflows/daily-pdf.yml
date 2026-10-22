@@ -13,7 +13,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: tender-refresh
+  group: daily-pdf
   cancel-in-progress: false
 
 jobs:
