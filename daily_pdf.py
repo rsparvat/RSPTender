@@ -251,7 +251,7 @@ def main():
     write_pdfs([(os.path.join(OUT_DIR, f[0]), build_html(f[1], f[2], f[3], f[4], f[5], upd)) for f in files])
     log(f"Singrauli MP: today {len(mp_today)}, all {len(mp)} | NCL: today {len(ncl_today)}, all {len(ncl)}")
 
-    links = f"\n\nपूरी लाइव लिस्ट: {SITE}\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: {PDF_TOOL}\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): {BUY_DSC}\n– रमाशंकर पर्वत (9752318084)"
+    links = f"\n\n🌐 वेबसाइट: https://rsparvat.com\nपूरी लाइव लिस्ट: {SITE}\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: {PDF_TOOL}\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): {BUY_DSC}\n– रमाशंकर पर्वत (9752318084)"
     captions = [
         f"📅 आज ({day}) अंतिम तिथि – MP टेंडर, सिंगरौली जिला: {len(mp_today)}",
         f"📋 सभी लाइव टेंडर (MP Portal) सिंगरौली जिला ({day}): {len(mp)}",
