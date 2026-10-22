@@ -75,7 +75,7 @@ async function render(i){
   }
   return shots[i.file]=out;
 }
-function zoomTo(img,w){w=Math.max(100,Math.min(400,w));img.style.width=w+'%';img.dataset.w=w}
+function zoomTo(img,w){w=Math.max(100,Math.min(400,w));$('track').querySelectorAll('img').forEach(m=>{m.style.width=w+'%';m.dataset.w=w})}
 function setIdx(n){idx=Math.max(0,Math.min(cur.length-1,n));$('vcnt').textContent=`पेज ${idx+1} / ${cur.length}`;$('vdl').href=cur[idx].url;$('vdl').download=cur[idx].name}
 function openViewer(out){
   cur=out;$('track').innerHTML=out.map(o=>`<div class="slide"><img src="${o.url}" alt="${esc(o.name)}" data-w="100"></div>`).join('');
