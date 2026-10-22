@@ -72,10 +72,13 @@ function draw(){
   $('day').textContent=data.date+(data.all_day?' · आज "सभी लाइव" वाली PDF भी भेजनी हैं':'');
   $('list').innerHTML=data.items.map((i,k)=>`<div class="card${i.count?'':' off'}"><h3>${esc(i.caption.split('\n')[0])}${i.send?'<span class="tag">आज भेजें</span>':''}</h3>
   <div class="meta">📄 ${esc(i.name)}${i.count?'':' · आज कोई टेंडर नहीं'}</div>
-  <div class="btns"><button class="wa" data-k="${k}" ${i.count?'':'disabled'}>📤 WhatsApp</button><button data-img="${k}" ${i.count?'':'disabled'}>🖼️ फोटो</button><a class="btn" href="data/pdf/${encodeURIComponent(i.file)}" download="${esc(i.name)}">⬇️ PDF</a></div></div>`).join('');
+  <div class="btns"><button class="wa" data-k="${k}" ${i.count?'':'disabled'}>📤 WhatsApp</button><button data-img="${k}" ${i.count?'':'disabled'}>🖼️ फोटो</button><a class="btn" href="data/pdf/${encodeURIComponent(i.file)}" download="${esc(i.name)}" data-dl="${k}">⬇️ PDF</a></div></div>`).join('');
   const send=data.items.filter(i=>i.send);$('allBtn').disabled=!send.length;$('allBtn').textContent=send.length?`📤 आज की ${send.length} PDF एक साथ भेजें`:'आज भेजने के लिए कोई PDF नहीं';
   if(!canFiles()){$('msg').className='note err';$('msg').textContent='यह पेज फ़ोन के Chrome में खोलें – वहीं से PDF और विवरण सीधे WhatsApp में जाते हैं। यहाँ “PDF” बटन से डाउनलोड कर सकते हैं।'}
 }
+document.addEventListener('click',async e=>{const a=e.target.closest('a[data-dl]');if(!a||!data)return;e.preventDefault();const i=data.items[+a.dataset.dl],old=a.textContent;a.textContent='⏳ डाउनलोड…';
+  try{const r=await fetch('data/pdf/'+i.file+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const u=URL.createObjectURL(new Blob([await r.arrayBuffer()],{type:'application/pdf'})),x=document.createElement('a');x.href=u;x.download=i.name;document.body.appendChild(x);x.click();x.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);a.textContent='✅ डाउनलोड हो गई';setTimeout(()=>a.textContent=old,3000)}
+  catch(err){a.textContent=old;location.href=a.href}});
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!data)return;
   if(b.id==='allBtn')share(data.items.filter(i=>i.send));
   else if(b.dataset.k!==undefined)share([data.items[+b.dataset.k]]);
