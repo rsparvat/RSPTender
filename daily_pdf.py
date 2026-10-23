@@ -212,6 +212,17 @@ def telegram_send(path, fname, caption):
 
 
 def main():
+    # Several scheduled runs each morning (GitHub often starts them late); only the
+    # first one makes and posts the PDFs. A manual run (FORCE=1) always does it.
+    if os.environ.get("FORCE") != "1":
+        try:
+            with open(os.path.join(OUT_DIR, "today.json"), encoding="utf-8") as fh:
+                done = json.load(fh).get("iso")
+        except Exception:
+            done = None
+        if done == datetime.datetime.now(IST).date().isoformat():
+            log("today's PDFs are already done - nothing to do")
+            return 0
     rows, generated = load_rows()
     now = datetime.datetime.now(IST)
     day = now.strftime("%d-%b-%Y")
