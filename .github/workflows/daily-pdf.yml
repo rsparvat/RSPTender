@@ -14,6 +14,11 @@ on:
     - cron: '12 2 * * *'   # 07:42 IST
     - cron: '42 2 * * *'   # 08:12 IST
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Aaj ki PDF dobara banao aur Telegram par bhejo (chahe pehle ja chuki ho)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -42,7 +47,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_IDS: ${{ vars.TELEGRAM_CHAT_IDS }}
-          FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+          FORCE: ${{ inputs.force && '1' || '' }}
         run: python daily_pdf.py
       - name: Save the PDFs in the repository
         run: |
