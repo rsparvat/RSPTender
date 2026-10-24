@@ -80,3 +80,24 @@ jobs:
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/$REPOSITORY/actions/workflows/pages.yml/dispatches" \
             -d '{"ref":"main"}'
+      - name: Start the daily PDFs if today's are not made yet
+        # GitHub drops most scheduled runs of daily-pdf.yml, but this refresh runs
+        # every ~35 minutes, so it starts the PDFs once after 05:50 IST each day.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          now=$(TZ=Asia/Kolkata date +%H%M); today=$(TZ=Asia/Kolkata date +%F)
+          made=$(python3 -c "import json;print(json.load(open('data/pdf/today.json')).get('iso',''))" 2>/dev/null || true)
+          if [ $((10#$now)) -ge 550 ] && [ "$made" != "$today" ]; then
+            echo "starting daily PDFs for $today"
+            curl --fail-with-body --retry 3 --retry-all-errors -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$REPOSITORY/actions/workflows/daily-pdf.yml/dispatches" \
+              -d '{"ref":"main"}'
+          else
+            echo "daily PDFs: nothing to start (time $now, done for '$made')"
+          fi
