@@ -1,36 +1,36 @@
 {
- "date": "27-Oct-2026",
- "iso": "2026-10-27",
- "data_at": "27-Oct-2026 05:49 AM",
+ "date": "28-Oct-2026",
+ "iso": "2026-10-28",
+ "data_at": "28-Oct-2026 05:35 AM",
  "all_day": false,
  "links": "🌐 वेबसाइट: https://rsparvat.com/go/site?s=wa\nपूरी लाइव लिस्ट: https://rsparvat.com/go/tm?s=wa\n\n🖊️ टेंडर PDF पर DSC साइन / कम्प्रेस / मर्ज: https://rsparvat.com/go/pdf?s=wa\n🔐 DSC खरीदें (5 मिनट में अप्रूवल): https://rsparvat.com/go/dscbuy?s=wa\n– रमाशंकर पर्वत (9752318084)",
  "items": [
   {
    "file": "Singrauli_MP_Today.pdf",
-   "name": "MP_Tenders_Singrauli_Today_27-10-2026.pdf",
-   "count": 5,
-   "caption": "📅 आज (27-Oct-2026) अंतिम तिथि – MP टेंडर, सिंगरौली जिला: 5",
+   "name": "MP_Tenders_Singrauli_Today_28-10-2026.pdf",
+   "count": 8,
+   "caption": "📅 आज (28-Oct-2026) अंतिम तिथि – MP टेंडर, सिंगरौली जिला: 8",
    "send": true
   },
   {
    "file": "Singrauli_MP_Live.pdf",
-   "name": "MP_Tenders_Singrauli_All_27-10-2026.pdf",
-   "count": 48,
-   "caption": "📋 सभी लाइव टेंडर (MP Portal) सिंगरौली जिला (27-Oct-2026): 48",
+   "name": "MP_Tenders_Singrauli_All_28-10-2026.pdf",
+   "count": 43,
+   "caption": "📋 सभी लाइव टेंडर (MP Portal) सिंगरौली जिला (28-Oct-2026): 43",
    "send": false
   },
   {
    "file": "NCL_Today.pdf",
-   "name": "NCL_Tenders_Today_27-10-2026.pdf",
-   "count": 4,
-   "caption": "📅 आज (27-Oct-2026) अंतिम तिथि – NCL टेंडर: 4",
+   "name": "NCL_Tenders_Today_28-10-2026.pdf",
+   "count": 11,
+   "caption": "📅 आज (28-Oct-2026) अंतिम तिथि – NCL टेंडर: 11",
    "send": true
   },
   {
    "file": "NCL_Live.pdf",
-   "name": "NCL_Tenders_All_27-10-2026.pdf",
-   "count": 74,
-   "caption": "📋 सभी लाइव टेंडर (NCL) (27-Oct-2026): 74",
+   "name": "NCL_Tenders_All_28-10-2026.pdf",
+   "count": 77,
+   "caption": "📋 सभी लाइव टेंडर (NCL) (28-Oct-2026): 77",
    "send": false
   }
  ]
