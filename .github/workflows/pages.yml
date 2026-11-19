@@ -27,6 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Build plain tender lists for Google / AI
+        continue-on-error: true
+        run: python3 build_static.py
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
