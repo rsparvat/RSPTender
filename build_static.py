@@ -113,6 +113,33 @@ def table(rows, show_area=True):
     return "".join(out)
 
 
+def inject_index(mp, coal, updated):
+    """Deploy-time only: put a short plain summary into the app's index.html so
+    tools that read the raw HTML (ChatGPT etc.) see real counts and the list
+    links. Browsers with JavaScript hide it at once, so customers never see it."""
+    p = os.path.join(ROOT, "index.html")
+    with open(p, encoding="utf-8") as fh:
+        s = fh.read()
+    if "rspStaticList" in s:
+        return
+    nmp, ncoal = sum(map(len, mp.values())), sum(map(len, coal.values()))
+    s = s.replace("Loading tender cache...",
+                  f"Loading tender cache... ({nmp + ncoal} live tenders, updated {updated})", 1)
+    links = " · ".join(f'<a href="list/mp/{slug(n)}.html">{esc(n)} ({len(r)})</a>' for n, r in sorted(mp.items()))
+    clinks = " · ".join(f'<a href="list/coal/{slug(n)}.html">{esc(n)} ({len(r)})</a>'
+                        for n, r in sorted(coal.items(), key=lambda x: -len(x[1])))
+    block = (f'<section id="rspStaticList" style="max-width:1200px;margin:16px auto;padding:0 16px;font:14px Arial">'
+             f'<h2>Live tender list (plain text) – updated {esc(updated)} IST</h2>'
+             f'<p>{nmp} live MP Tenders and {ncoal} live Coal India tenders. Full district-wise list with work name, '
+             f'value, EMD and last date: <a href="list/">tenders.rsparvat.com/list/</a></p>'
+             f'<p><b>MP Tenders by district:</b> {links}</p><p><b>Coal India by company:</b> {clinks}</p>'
+             f'<p>By Ramashankar Parvat – <a href="https://rsparvat.com/">rsparvat.com</a> · WhatsApp 9752318084</p></section>'
+             '<script>document.getElementById("rspStaticList").hidden=true</script>\n')
+    s = s.replace("</body>", block + "</body>", 1)
+    with open(p, "w", encoding="utf-8") as fh:
+        fh.write(s)
+
+
 def main():
     with open(os.path.join(ROOT, "data", "tenders.json"), encoding="utf-8") as fh:
         data = json.load(fh)
@@ -202,6 +229,8 @@ def main():
             f"- Coal India, one page per company: {SITE}list/coal/<company>.html "
             f"(e.g. {SITE}list/coal/ncl.html)\n\n"
             f"Updated {updated} IST. Website: rsparvat.com, WhatsApp 9752318084.\n")
+    if os.environ.get("GITHUB_ACTIONS"):
+        inject_index(mp, coal, updated)
     print(f"static lists: {len(mp)} MP districts, {len(coal)} coal companies, {len(live)} live tenders, "
           f"{len(closing)} closing today")
     return 0
